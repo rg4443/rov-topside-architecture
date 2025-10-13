@@ -6,13 +6,21 @@ You may use [QT Creator](https://www.qt.io/product/development-tools) for develo
 
 Alternatively, you may follow the below instructions to setup a IDE agnostic environment:
 1.  create build directory inside test_QT
-`mkdir build`
+```
+mkdir build
+```
 2.  cd into build
-`cd build`
+```
+cd build
+```
 3. run cmake and let it setup build workspace
-`cmake ..`
+```
+cmake ..
+```
 4. now run gnu make
-`make`
+```
+make
+```
 
 Clangd is also utilized to lint and make a consistent format. Your favorite text editor (Emacs, VSCode, Vim) should have LSP server functionality that handles and talk with clangd, so no additional configuration is needed to setup clangd, _except_ for the following: 
 You need to export the compile commands that CMake uses, which includes all the headers and stuff that QT includes. Simply do the following: 

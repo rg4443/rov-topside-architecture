@@ -19,6 +19,9 @@ set(PROJECT_SOURCES
         mainwindow.ui
 )
 
+# ABSOLUTELY NO Exceptions!!!
+add_compile_options(-fno-exceptions)
+
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(test_QT
         MANUAL_FINALIZATION

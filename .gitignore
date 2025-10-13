@@ -82,3 +82,4 @@ CMakeLists.txt.user*
 
 # ** Adapted from QT Creator, but also ignore ANY directory matching build
 build/
+*project.json.user

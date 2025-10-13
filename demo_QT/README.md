@@ -51,7 +51,7 @@ In additional to setting up a build environment, CMake will also output a `compi
 }
 ]
 ```
-2. Now symlink this file to the root project directory (in this case 2025-26-MATE-Topside/demo_QT)
+2. Now symlink this file at the root project directory (in this case 2025-26-MATE-Topside/demo_QT)
 ```
 ln -s build/compile_commands.json .
 ```

@@ -26,7 +26,7 @@ Clangd is also utilized to lint and make a consistent format. Your favorite text
 You need to export the compile commands that CMake uses, which includes all the headers and stuff that QT includes. Simply do the following: 
 1. Run cmake with `CMAKE_EXPORT_COMPILE_COMMANDS` flag enabled
 ```
-cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 ```
 In additional to setting up a build environment, CMake will also output a `compile_commands.json`, a JSON file containing the required commands to compile the project. This includes all the information clangd needs to know. It looks something like this
 ``` json

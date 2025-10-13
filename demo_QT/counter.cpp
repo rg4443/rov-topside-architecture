@@ -19,7 +19,7 @@ Counter::Counter(QWidget *parent)
 	this->timer->setInterval(100);
 
 	// Button Layout
-	QHBoxLayout *buttonLayout = new QHBoxLayout(this);
+	QHBoxLayout *buttonLayout = new QHBoxLayout();
 	buttonLayout->addWidget(this->startButton);
 	buttonLayout->addWidget(this->stopButton);
 	buttonLayout->addWidget(this->resetButton);
@@ -27,7 +27,7 @@ Counter::Counter(QWidget *parent)
 	// Main Layout
 	// \_ Display Widget
 	// \_ Button Layout
-	QVBoxLayout *mainLayout = new QVBoxLayout(this);
+	QVBoxLayout *mainLayout = new QVBoxLayout();
 	mainLayout->addWidget(displayLabel);
 	mainLayout->addLayout(buttonLayout);
 

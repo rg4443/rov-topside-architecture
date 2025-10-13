@@ -57,57 +57,6 @@ QGroupBox { background: #171717; border-color: rgba(255, 255, 255, 26); border-w
       </item>
      </layout>
     </item>
-    <item row="2" column="0" colspan="2">
-     <widget class="QGroupBox" name="groupBox">
-      <property name="title">
-       <string/>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_5">
-       <item row="0" column="0">
-        <widget class="QPlainTextEdit" name="plainTextEdit">
-         <property name="styleSheet">
-          <string notr="true">QPlainTextEdit { border: none }</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item row="0" column="1">
-     <widget class="QGroupBox" name="groupBox_2">
-      <property name="title">
-       <string/>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_4">
-       <item row="0" column="0">
-        <widget class="QLCDNumber" name="lcdNumber"/>
-       </item>
-       <item row="1" column="0">
-        <widget class="QTimeEdit" name="timeEdit"/>
-       </item>
-       <item row="2" column="0">
-        <widget class="QDateEdit" name="dateEdit"/>
-       </item>
-       <item row="4" column="0">
-        <widget class="QRadioButton" name="radioButton_2">
-         <property name="styleSheet">
-          <string notr="true">QCheckBox { background: red }</string>
-         </property>
-         <property name="text">
-          <string>RadioButton</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QRadioButton" name="radioButton">
-         <property name="text">
-          <string>RadioButton</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
     <item row="0" column="2">
      <widget class="QGroupBox" name="groupBox_4">
       <property name="maximumSize">
@@ -154,8 +103,59 @@ QPushButton:hover { background-color:  rgb(12, 48, 162)}</string>
       </layout>
      </widget>
     </item>
+    <item row="0" column="1">
+     <widget class="QGroupBox" name="groupBox_2">
+      <property name="title">
+       <string/>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_4">
+       <item row="0" column="0">
+        <widget class="QLCDNumber" name="lcdNumber"/>
+       </item>
+       <item row="1" column="0">
+        <widget class="QTimeEdit" name="timeEdit"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QDateEdit" name="dateEdit"/>
+       </item>
+       <item row="4" column="0">
+        <widget class="QRadioButton" name="radioButton_2">
+         <property name="styleSheet">
+          <string notr="true">QCheckBox { background: red }</string>
+         </property>
+         <property name="text">
+          <string>RadioButton</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QRadioButton" name="radioButton">
+         <property name="text">
+          <string>RadioButton</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
     <item row="2" column="2">
      <widget class="Counter" name="widget" native="true"/>
+    </item>
+    <item row="2" column="0" colspan="2">
+     <widget class="QGroupBox" name="groupBox">
+      <property name="title">
+       <string/>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_5">
+       <item row="0" column="0">
+        <widget class="QPlainTextEdit" name="plainTextEdit">
+         <property name="styleSheet">
+          <string notr="true">QPlainTextEdit { border: none }</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </item>
    </layout>
   </widget>

@@ -1,0 +1,9 @@
+[0.010s] Invoking command in '/home/kyle/2025-26-MATE-Topside/build/test_QT': /usr/bin/cmake --build /home/kyle/2025-26-MATE-Topside/build/test_QT -- -j8 -l8
+[0.062s] [  0%] Built target test_QT_autogen_timestamp_deps
+[0.083s] [ 14%] Built target test_QT_autogen
+[0.108s] [100%] Built target test_QT
+[0.130s] Invoked command in '/home/kyle/2025-26-MATE-Topside/build/test_QT' returned '0': /usr/bin/cmake --build /home/kyle/2025-26-MATE-Topside/build/test_QT -- -j8 -l8
+[0.144s] Invoking command in '/home/kyle/2025-26-MATE-Topside/build/test_QT': /usr/bin/cmake --install /home/kyle/2025-26-MATE-Topside/build/test_QT
+[0.147s] -- Install configuration: ""
+[0.147s] -- Up-to-date: /home/kyle/2025-26-MATE-Topside/install/test_QT/bin/test_QT
+[0.149s] Invoked command in '/home/kyle/2025-26-MATE-Topside/build/test_QT' returned '0': /usr/bin/cmake --install /home/kyle/2025-26-MATE-Topside/build/test_QT

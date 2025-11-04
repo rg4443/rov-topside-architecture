@@ -1,0 +1,37 @@
+[1.053s] Invoking command in '/home/kyle/2025-26-MATE-Topside/controls': AMENT_PREFIX_PATH=/home/kyle/2025-26-MATE-Topside/install/control_msg:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/kyle/2025-26-MATE-Topside/install/control_msg:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/kyle/2025-26-MATE-Topside/install/control_msg/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/kyle/2025-26-MATE-Topside/build/controls/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages:/home/kyle/2025-26-MATE-Topside/install/control_msg/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/controls build --build-base /home/kyle/2025-26-MATE-Topside/build/controls/build install --record /home/kyle/2025-26-MATE-Topside/build/controls/install.log --single-version-externally-managed install_data
+[1.227s] running egg_info
+[1.227s] creating ../build/controls/controls.egg-info
+[1.238s] writing ../build/controls/controls.egg-info/PKG-INFO
+[1.240s] writing dependency_links to ../build/controls/controls.egg-info/dependency_links.txt
+[1.241s] writing entry points to ../build/controls/controls.egg-info/entry_points.txt
+[1.241s] writing requirements to ../build/controls/controls.egg-info/requires.txt
+[1.241s] writing top-level names to ../build/controls/controls.egg-info/top_level.txt
+[1.241s] writing manifest file '../build/controls/controls.egg-info/SOURCES.txt'
+[1.266s] reading manifest file '../build/controls/controls.egg-info/SOURCES.txt'
+[1.266s] writing manifest file '../build/controls/controls.egg-info/SOURCES.txt'
+[1.266s] running build
+[1.267s] running build_py
+[1.267s] creating /home/kyle/2025-26-MATE-Topside/build/controls/build
+[1.267s] creating /home/kyle/2025-26-MATE-Topside/build/controls/build/lib
+[1.267s] creating /home/kyle/2025-26-MATE-Topside/build/controls/build/lib/controls
+[1.267s] copying controls/__init__.py -> /home/kyle/2025-26-MATE-Topside/build/controls/build/lib/controls
+[1.268s] copying controls/controls.py -> /home/kyle/2025-26-MATE-Topside/build/controls/build/lib/controls
+[1.268s] running install
+[1.276s] running install_lib
+[1.284s] creating /home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages/controls
+[1.285s] copying /home/kyle/2025-26-MATE-Topside/build/controls/build/lib/controls/__init__.py -> /home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages/controls
+[1.285s] copying /home/kyle/2025-26-MATE-Topside/build/controls/build/lib/controls/controls.py -> /home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages/controls
+[1.286s] byte-compiling /home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages/controls/__init__.py to __init__.cpython-312.pyc
+[1.286s] byte-compiling /home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages/controls/controls.py to controls.cpython-312.pyc
+[1.287s] running install_data
+[1.287s] creating /home/kyle/2025-26-MATE-Topside/install/controls/share/ament_index
+[1.288s] creating /home/kyle/2025-26-MATE-Topside/install/controls/share/ament_index/resource_index
+[1.288s] creating /home/kyle/2025-26-MATE-Topside/install/controls/share/ament_index/resource_index/packages
+[1.288s] copying resource/controls -> /home/kyle/2025-26-MATE-Topside/install/controls/share/ament_index/resource_index/packages
+[1.288s] copying package.xml -> /home/kyle/2025-26-MATE-Topside/install/controls/share/controls
+[1.288s] running install_egg_info
+[1.302s] Copying ../build/controls/controls.egg-info to /home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages/controls-0.0.0-py3.12.egg-info
+[1.303s] running install_scripts
+[1.392s] Installing controls script to /home/kyle/2025-26-MATE-Topside/install/controls/lib/controls
+[1.392s] writing list of installed files to '/home/kyle/2025-26-MATE-Topside/build/controls/install.log'
+[1.412s] Invoked command in '/home/kyle/2025-26-MATE-Topside/controls' returned '0': AMENT_PREFIX_PATH=/home/kyle/2025-26-MATE-Topside/install/control_msg:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/kyle/2025-26-MATE-Topside/install/control_msg:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/kyle/2025-26-MATE-Topside/install/control_msg/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/kyle/2025-26-MATE-Topside/build/controls/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages:/home/kyle/2025-26-MATE-Topside/install/control_msg/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/controls build --build-base /home/kyle/2025-26-MATE-Topside/build/controls/build install --record /home/kyle/2025-26-MATE-Topside/build/controls/install.log --single-version-externally-managed install_data

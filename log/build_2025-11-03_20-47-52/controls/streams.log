@@ -1,0 +1,21 @@
+[0.736s] Invoking command in '/home/kyle/2025-26-MATE-Topside/controls': PYTHONPATH=/home/kyle/2025-26-MATE-Topside/build/controls/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages:/home/kyle/2025-26-MATE-Topside/install/control_msg/lib/python3.12/site-packages:/home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages:/opt/ros/jazzy/lib/python3.12/site-packages /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/controls build --build-base /home/kyle/2025-26-MATE-Topside/build/controls/build install --record /home/kyle/2025-26-MATE-Topside/build/controls/install.log --single-version-externally-managed install_data
+[0.907s] running egg_info
+[0.919s] writing ../build/controls/controls.egg-info/PKG-INFO
+[0.920s] writing dependency_links to ../build/controls/controls.egg-info/dependency_links.txt
+[0.921s] writing entry points to ../build/controls/controls.egg-info/entry_points.txt
+[0.921s] writing requirements to ../build/controls/controls.egg-info/requires.txt
+[0.921s] writing top-level names to ../build/controls/controls.egg-info/top_level.txt
+[0.953s] reading manifest file '../build/controls/controls.egg-info/SOURCES.txt'
+[0.955s] writing manifest file '../build/controls/controls.egg-info/SOURCES.txt'
+[0.955s] running build
+[0.955s] running build_py
+[0.955s] running install
+[0.958s] running install_lib
+[0.973s] running install_data
+[0.973s] running install_egg_info
+[0.989s] removing '/home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages/controls-0.0.0-py3.12.egg-info' (and everything under it)
+[0.989s] Copying ../build/controls/controls.egg-info to /home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages/controls-0.0.0-py3.12.egg-info
+[0.989s] running install_scripts
+[1.096s] Installing controls script to /home/kyle/2025-26-MATE-Topside/install/controls/lib/controls
+[1.096s] writing list of installed files to '/home/kyle/2025-26-MATE-Topside/build/controls/install.log'
+[1.112s] Invoked command in '/home/kyle/2025-26-MATE-Topside/controls' returned '0': PYTHONPATH=/home/kyle/2025-26-MATE-Topside/build/controls/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages:/home/kyle/2025-26-MATE-Topside/install/control_msg/lib/python3.12/site-packages:/home/kyle/2025-26-MATE-Topside/install/controls/lib/python3.12/site-packages:/opt/ros/jazzy/lib/python3.12/site-packages /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/controls build --build-base /home/kyle/2025-26-MATE-Topside/build/controls/build install --record /home/kyle/2025-26-MATE-Topside/build/controls/install.log --single-version-externally-managed install_data

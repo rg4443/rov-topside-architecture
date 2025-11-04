@@ -1,0 +1,3 @@
+Invoking command in '/home/kyle/2025-26-MATE-Topside/build/test_QT': /usr/bin/cmake /home/kyle/2025-26-MATE-Topside/demo_QT -DCMAKE_INSTALL_PREFIX=/home/kyle/2025-26-MATE-Topside/install/test_QT
+Invoked command in '/home/kyle/2025-26-MATE-Topside/build/test_QT' returned '0': /usr/bin/cmake /home/kyle/2025-26-MATE-Topside/demo_QT -DCMAKE_INSTALL_PREFIX=/home/kyle/2025-26-MATE-Topside/install/test_QT
+Invoking command in '/home/kyle/2025-26-MATE-Topside/build/test_QT': /usr/bin/cmake --build /home/kyle/2025-26-MATE-Topside/build/test_QT -- -j8 -l8

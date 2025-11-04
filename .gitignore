@@ -85,3 +85,11 @@ build/
 *project.json.user
 .cache/
 compile_commands.json
+
+.vscode/
+
+# ROS generated files
+devel/
+build/
+install/
+log/

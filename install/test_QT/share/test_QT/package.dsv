@@ -1,6 +1,0 @@
-source;share/test_QT/hook/path.ps1
-source;share/test_QT/hook/path.dsv
-source;share/test_QT/hook/path.sh
-source;share/test_QT/hook/pythonscriptspath.ps1
-source;share/test_QT/hook/pythonscriptspath.dsv
-source;share/test_QT/hook/pythonscriptspath.sh

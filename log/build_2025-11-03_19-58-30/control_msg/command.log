@@ -1,2 +1,0 @@
-Invoking command in '/home/kyle/2025-26-MATE-Topside/build/control_msg': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake /home/kyle/2025-26-MATE-Topside/control_msg -DCMAKE_INSTALL_PREFIX=/home/kyle/2025-26-MATE-Topside/install/control_msg
-Invoked command in '/home/kyle/2025-26-MATE-Topside/build/control_msg' returned '1': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake /home/kyle/2025-26-MATE-Topside/control_msg -DCMAKE_INSTALL_PREFIX=/home/kyle/2025-26-MATE-Topside/install/control_msg

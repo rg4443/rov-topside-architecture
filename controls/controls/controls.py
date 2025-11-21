@@ -27,17 +27,17 @@ class ControlsNode(Node):
             msg.right_y = self.joystick.get_axis(4)
             msg.left_trigger = self.joystick.get_axis(2)
             msg.right_trigger = self.joystick.get_axis(5)
-            msg.a = self.joystick.get_button(0)
-            msg.b = self.joystick.get_button(1)
-            msg.x = self.joystick.get_button(2)
-            msg.y = self.joystick.get_button(3)
-            msg.left_bumper = self.joystick.get_button(4)
-            msg.right_bumper = self.joystick.get_button(5)
-            msg.back = self.joystick.get_button(6)
-            msg.start = self.joystick.get_button(7)
-            msg.left_stick_pressed = self.joystick.get_button(8)
-            msg.right_stick_pressed = self.joystick.get_button(9)
-            msg.guide = self.joystick.get_button(10)
+            msg.a = self.joystick.get_button(0) == 1
+            msg.b = self.joystick.get_button(1) == 1
+            msg.x = self.joystick.get_button(2) == 1
+            msg.y = self.joystick.get_button(3) == 1
+            msg.left_bumper = self.joystick.get_button(4) == 1
+            msg.right_bumper = self.joystick.get_button(5) == 1
+            msg.back = self.joystick.get_button(6) == 1
+            msg.start = self.joystick.get_button(7) == 1
+            msg.left_stick_pressed = self.joystick.get_button(8) == 1
+            msg.right_stick_pressed = self.joystick.get_button(9) == 1
+            msg.guide = self.joystick.get_button(10) == 1
             hat = self.joystick.get_hat(0)
             msg.dpad_up = hat[1] == 1
             msg.dpad_down = hat[1] == -1

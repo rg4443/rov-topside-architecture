@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools', 'rclpy', 'pymavlink', 'RPi.GPIO'],
+    install_requires=['setuptools', 'rclpy', 'pymavlink', 'RPi.GPIO', 'pigpio'],
     zip_safe=True,
     maintainer='kyle',
     maintainer_email='keldridge07@gmail.com',

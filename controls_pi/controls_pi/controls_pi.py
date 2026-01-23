@@ -1,20 +1,25 @@
 import rclpy
 from control_msg.msg import ControllerInput
 from rclpy.node import Node
-
 from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink_common
+import RPi.GPIO as GPIO
 
 class ControlsPI (Node):
     def __init__(self):
         super().__init__('controls_pi_node')
+        self.pin = 18
         self.subscriber = self.create_subscription(ControllerInput, 'controller_input', self.callback, 10)
         self.target = 1
         self.connection = None
         self.connect()
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.pin, GPIO.OUT)
 
     def destroy_node(self):
         self.close()
+        GPIO.output(self.pin, 1)
         super().destroy_node()
 
     def close(self):
@@ -51,6 +56,8 @@ class ControlsPI (Node):
         buttons += int(msg.dpad_right) << 15
 
         self.send_message(x, y, z, roll, pitch, yaw, buttons)
+
+        GPIO.output(self.pin, 1-msg.a)
     
     def connect(self):
         try:

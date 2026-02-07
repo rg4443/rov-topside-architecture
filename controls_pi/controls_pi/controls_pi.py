@@ -10,8 +10,6 @@ class ControlsPI (Node):
     def __init__(self):
         super().__init__('controls_pi_node')
         self.pin = 18
-        self.motor1 = 13
-        self.motor2 = 19
         self.subscriber = self.create_subscription(ControllerInput, 'controller_input', self.callback, 10)
         self.target = 1
         self.connection = None
@@ -19,20 +17,10 @@ class ControlsPI (Node):
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.pin, GPIO.OUT)
-        self.pi = pigpio.pi()
-        if not self.pi.connected:
-            self.get_logger().error('Failed to connect to pigpio daemon')
-        self.pi.set_PWM_frequency(self.motor1, 50)
-        self.pi.set_PWM_range(self.motor1, 20000)
-        self.pi.set_PWM_frequency(self.motor2, 50)
-        self.pi.set_PWM_range(self.motor2, 20000)
-        self.set_PWM(1500)
 
     def destroy_node(self):
         self.close()
         GPIO.output(self.pin, 1)
-        self.set_PWM(1500)
-        self.pi.stop()
         super().destroy_node()
 
     def close(self):
@@ -42,20 +30,13 @@ class ControlsPI (Node):
             pass
         self.connection = None
 
-    def set_PWM(self, pulse_width):
-        if not self.pi.connected:
-            return
-        pulse_width = max(1100, min(1900, pulse_width))
-        self.pi.set_PWM_dutycycle(self.motor1, pulse_width)
-        self.pi.set_PWM_dutycycle(self.motor2, pulse_width)
-
     def callback(self, msg):
         x = round(msg.left_y * 1000)
         y = round(msg.left_x * 1000)
         z = round(msg.right_y * 1000)
         yaw = round(msg.right_x * 1000)
         pitch = 0
-        roll = round((msg.left_trigger - msg.right_trigger) * 1000)
+        roll = round((msg.left_trigger - msg.right_trigger) * 500)
 
         buttons = 0
         buttons += int(msg.a) << 0
@@ -78,7 +59,6 @@ class ControlsPI (Node):
         self.send_message(x, y, z, roll, pitch, yaw, buttons)
 
         GPIO.output(self.pin, 1-msg.a)
-        self.set_PWM(int(msg.right_y * 400 + 1500))
     
     def connect(self):
         try:

@@ -11,7 +11,7 @@ from time import perf_counter
 import XConfigMap
 
 BAUD_RATE = 115200
-PORT = "/dev/ttyACM0"
+PORT = "/dev/ttyACM2"
 last_update = time.perf_counter()
 MAX_MSG_DELAY = 0.1
 INIT_WAIT = 2

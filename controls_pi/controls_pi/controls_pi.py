@@ -5,6 +5,7 @@ from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink_common
 import RPi.GPIO as GPIO
 import pigpio
+import time
 
 class ControlsPI (Node):
     def __init__(self):
@@ -71,6 +72,7 @@ class ControlsPI (Node):
     def connect(self):
         try:
             print('Connecting to MAVLink...')
+            self.connection = mavutil.mavlink_connection('/dev/ttyACM0', baud=115200)
             for port in range(10):
                 try:
                     self.connection = mavutil.mavlink_connection(f'/dev/ttyACM{port}', baud=115200)
@@ -93,7 +95,7 @@ class ControlsPI (Node):
                     self.get_logger().info('Motors armed.')
                 else:
                     self.get_logger().info('Motors already armed.')
-                self.lastMessage = self.clock().now()
+                self.lastMessage = time.time()
             except Exception as e:
                 self.get_logger().error(f'Connection failed. Error: {e}')
                 self.close()
@@ -105,13 +107,13 @@ class ControlsPI (Node):
             self.connect()
             if self.connection is None or self.connection.mav is None:
                 return
-        currentTime = self.clock().now()
+        currentTime = time.time()
         try:
             while self.connection.recv_match(blocking=False) is not None:
                 self.lastMessage = currentTime
         except Exception as e:
             pass
-        if (currentTime - self.lastMessage).nanoseconds > 2000000000:
+        if (currentTime - self.lastMessage) > 2.0:
             self.get_logger().warning('MAVLink connection lost. Reconnecting...')
             self.close()
             self.connect()

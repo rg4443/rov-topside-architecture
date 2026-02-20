@@ -96,7 +96,7 @@ class ControlsPI (Node):
             #buttons2 = 0, enabled_extensions = 3, s = pitch, t = roll)
         try:
             self.connection.mav.send(message)
-            self.get_logger().debug(str(message))
+            self.get_logger().info(str(message))
         except Exception:
             self.get_logger().error('MAVLink disconnected. Reconnecting...')
             self.close()

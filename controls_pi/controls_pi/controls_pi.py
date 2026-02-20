@@ -62,10 +62,12 @@ class ControlsPI (Node):
     
     def connect(self):
         try:
+            print('Connecting to MAVLink...')
             self.connection = mavutil.mavlink_connection('/dev/ttyACM0', baud=115200)
             try:
                 self.connection.wait_heartbeat(timeout=5)
                 self.target = self.connection.target_system
+                self.get_logger().info(f'Connected to MAVLink target {self.target}.')
             except Exception:
                 self.get_logger().error('Failed to receive heartbeat from MAVLink.')
                 self.close()
@@ -78,8 +80,8 @@ class ControlsPI (Node):
             if self.connection is None or self.connection.mav is None:
                 return
         message = mavlink_common.MAVLink_manual_control_message(
-            self.target, x, y, z, yaw, buttons,
-            buttons2 = 0, enabled_extensions = 3, s = pitch, t = roll)
+            self.target, x, y, z, yaw, buttons)
+            #buttons2 = 0, enabled_extensions = 3, s = pitch, t = roll)
         try:
             self.connection.mav.send(message)
         except Exception:

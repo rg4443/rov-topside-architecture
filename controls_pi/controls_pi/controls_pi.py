@@ -68,6 +68,18 @@ class ControlsPI (Node):
                 self.connection.wait_heartbeat(timeout=5)
                 self.target = self.connection.target_system
                 self.get_logger().info(f'Connected to MAVLink target {self.target}.')
+                if not self.connection.motors_armed():
+                    print('Arming motors...')
+                    self.connection.mav.command_long_send(
+                        self.target, self.connection.target_component,
+                        mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+                        0,
+                        1,  # 1 = arm, 0 = disarm
+                        0, 0, 0, 0, 0, 0)
+                    self.connection.motors_armed_wait()
+                    self.get_logger().info('Motors armed.')
+                else:
+                    self.get_logger().info('Motors already armed.')
             except Exception:
                 self.get_logger().error('Failed to receive heartbeat from MAVLink.')
                 self.close()
@@ -84,6 +96,7 @@ class ControlsPI (Node):
             #buttons2 = 0, enabled_extensions = 3, s = pitch, t = roll)
         try:
             self.connection.mav.send(message)
+            self.get_logger().debug(str(message))
         except Exception:
             self.get_logger().error('MAVLink disconnected. Reconnecting...')
             self.close()

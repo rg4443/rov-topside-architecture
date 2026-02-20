@@ -41,7 +41,7 @@ class ControlsPI (Node):
 
     def callback(self, msg):
         x = round(msg.left_y * 1000)
-        y = round(msg.left_x * 1000)
+        y = round(-msg.left_x * 1000)
         z = round(msg.right_y * 500) + 500
         yaw = round(msg.right_x * 1000)
         pitch = 0

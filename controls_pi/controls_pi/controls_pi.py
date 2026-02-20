@@ -12,6 +12,7 @@ class ControlsPI (Node):
         self.pin = 18
         self.subscriber = self.create_subscription(ControllerInput, 'controller_input', self.callback, 10)
         self.target = 1
+        self.lastMessage = 0
         self.connection = None
         self.connect()
         GPIO.setwarnings(False)
@@ -70,7 +71,12 @@ class ControlsPI (Node):
     def connect(self):
         try:
             print('Connecting to MAVLink...')
-            self.connection = mavutil.mavlink_connection('/dev/ttyACM0', baud=115200)
+            for port in range(10):
+                try:
+                    self.connection = mavutil.mavlink_connection(f'/dev/ttyACM{port}', baud=115200)
+                    break
+                except Exception:
+                    pass
             try:
                 self.connection.wait_heartbeat(timeout=5)
                 self.target = self.connection.target_system
@@ -87,6 +93,7 @@ class ControlsPI (Node):
                     self.get_logger().info('Motors armed.')
                 else:
                     self.get_logger().info('Motors already armed.')
+                self.lastMessage = self.clock().now()
             except Exception as e:
                 self.get_logger().error(f'Connection failed. Error: {e}')
                 self.close()
@@ -98,6 +105,16 @@ class ControlsPI (Node):
             self.connect()
             if self.connection is None or self.connection.mav is None:
                 return
+        currentTime = self.clock().now()
+        try:
+            while self.connection.recv_match(blocking=False) is not None:
+                self.lastMessage = currentTime
+        except Exception as e:
+            pass
+        if (currentTime - self.lastMessage).nanoseconds > 2000000000:
+            self.get_logger().warning('MAVLink connection lost. Reconnecting...')
+            self.close()
+            self.connect()
         message = mavlink_common.MAVLink_manual_control_message(
             self.target, x, y, z, yaw, buttons)
             #buttons2 = 0, enabled_extensions = 3, s = pitch, t = roll)

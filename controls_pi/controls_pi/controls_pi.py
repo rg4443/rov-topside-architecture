@@ -72,7 +72,6 @@ class ControlsPI (Node):
     def connect(self):
         try:
             print('Connecting to MAVLink...')
-            self.connection = mavutil.mavlink_connection('/dev/ttyACM0', baud=115200)
             for port in range(10):
                 try:
                     self.connection = mavutil.mavlink_connection(f'/dev/ttyACM{port}', baud=115200)

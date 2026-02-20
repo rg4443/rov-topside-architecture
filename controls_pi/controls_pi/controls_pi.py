@@ -31,12 +31,12 @@ class ControlsPI (Node):
         self.connection = None
 
     def callback(self, msg):
-        x = round(msg.left_y * 1000)
-        y = round(msg.left_x * 1000)
-        z = round(msg.right_y * 1000)
-        yaw = round(msg.right_x * 1000)
+        x = round(msg.left_y * 500) + 500
+        y = round(msg.left_x * 500) + 500
+        z = round(msg.right_y * 500) + 500
+        yaw = round(msg.right_x * 500) + 500
         pitch = 0
-        roll = round((msg.left_trigger - msg.right_trigger) * 500)
+        roll = round((msg.left_trigger - msg.right_trigger) * 250) + 500
 
         buttons = 0
         buttons += int(msg.a) << 0

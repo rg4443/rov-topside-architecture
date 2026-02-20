@@ -24,6 +24,13 @@ class ControlsPI (Node):
         super().destroy_node()
 
     def close(self):
+        # Try to send a stop message if it didn't crash
+        try:
+            message = mavlink_common.MAVLink_manual_control_message(self.target, 0, 0, 500, 0, 0)
+            self.connection.mav.send(message)
+        except Exception:
+            pass
+        # Close the connection
         try:
             self.connection.close()
         except Exception:
@@ -31,8 +38,8 @@ class ControlsPI (Node):
         self.connection = None
 
     def callback(self, msg):
-        x = round(msg.left_y) + 1000
-        y = round(msg.left_x) + 1000
+        x = round(msg.left_y * 1000)
+        y = round(msg.left_x * 1000)
         z = round(msg.right_y * 500) + 500
         yaw = round(msg.right_x * 500) + 500
         pitch = 0

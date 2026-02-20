@@ -62,8 +62,7 @@ class ControlsPI (Node):
     
     def connect(self):
         try:
-            # TODO: Change connection string
-            self.connection = mavutil.mavlink_connection('udpout:127.0.0.1:14550')
+            self.connection = mavutil.mavlink_connection('/dev/ttyACM0', baud=115200)
             try:
                 self.connection.wait_heartbeat(timeout=5)
                 self.target = self.connection.target_system

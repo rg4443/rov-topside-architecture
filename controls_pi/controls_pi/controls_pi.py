@@ -67,7 +67,7 @@ class ControlsPI (Node):
             try:
                 self.connection.wait_heartbeat(timeout=5)
                 self.target = self.connection.target_system
-                self.get_logger().info(f'Connected to MAVLink target {self.target}.')
+                self.get_logger().info(f'Received heartbeat. Target: {self.target}.')
                 if not self.connection.motors_armed():
                     print('Arming motors...')
                     self.connection.mav.command_long_send(
@@ -80,11 +80,11 @@ class ControlsPI (Node):
                     self.get_logger().info('Motors armed.')
                 else:
                     self.get_logger().info('Motors already armed.')
-            except Exception:
-                self.get_logger().error('Failed to receive heartbeat from MAVLink.')
+            except Exception as e:
+                self.get_logger().error(f'Connection failed. Error: {e}')
                 self.close()
-        except Exception:
-            self.get_logger().error('Failed to establish MAVLink connection.')
+        except Exception as e:
+            self.get_logger().error(f'Failed to establish MAVLink connection. Error: {e}')
 
     def send_message(self, x, y, z, roll, pitch, yaw, buttons):
         if self.connection is None or self.connection.mav is None:
@@ -97,8 +97,8 @@ class ControlsPI (Node):
         try:
             self.connection.mav.send(message)
             self.get_logger().info(str(message))
-        except Exception:
-            self.get_logger().error('MAVLink disconnected. Reconnecting...')
+        except Exception as e:
+            self.get_logger().error(f'MAVLink disconnected. Reconnecting... Error: {e}')
             self.close()
             self.connect()
 

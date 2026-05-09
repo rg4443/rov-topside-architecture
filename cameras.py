@@ -43,7 +43,7 @@ class Frame:
             return self.frame.copy()
 
 res = (1920, 1080)
-res2 = (res[0]/3, res[1]/3)
+res2 = (res[0]//3, res[1]//3)
 def combine(imgs):
     global res, res2
     img1 = cv2.resize(imgs[0], res)
@@ -57,6 +57,7 @@ interrupt = False
 model = YOLO("runs/detect/train6/weights/best.pt")
 
 def run_camera(url, frame, model=None):
+    global interrupt
     try:
         video = cv2.VideoCapture(url)
         while not interrupt:

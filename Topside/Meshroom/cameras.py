@@ -176,28 +176,17 @@ def run_photogrammetry():
     global generating, photogrammetryProc
     generating = True
 
-    workspace_dir = os.path.join(output_folder, "colmap_workspace")
-    os.makedirs(workspace_dir, exist_ok=True)
-    
-    colmap_path = shutil.which("colmap")
-    if not colmap_path:
-        print("[ERROR] Could not find 'colmap' installed on this system.")
-        print("[Fix] Please run: sudo apt install colmap (on Ubuntu/Debian) or install it via your package manager.")
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    tool_path = os.path.join(base_path, "capture_tool")
+    output_file = os.path.join(output_folder, "model.usdz")
+
+    if not os.path.isfile(tool_path):
+        print(f"[ERROR] Could not find compiled swift tool at: {tool_path}.")
+        print("[Fix] Please run: swiftc -O -target arm64-apple-macos12 capture.swift -o capture_tool")
         generating = False
         return
 
-    cmd = [
-        "colmap", "automatic_reconstructor",
-        "--image_path", image_folder,
-        "--workspace_path", workspace_dir,
-        "--data_type", "individual",        
-        "--quality", "medium",              
-        "--use_gpu", "0",                   
-        "--num_threads", "-1"               
-    ]
-
-    print(f"[System] Initializing COLMAP CPU reconstruction...")
-    print(f"[System] Processing may take a while depending on your laptop's CPU.")
+    cmd = [tool_path, image_folder, output_file]
 
     with open("photogrammetry.log", "w") as logfile:
         proc = subprocess.Popen(
@@ -210,25 +199,16 @@ def run_photogrammetry():
         photogrammetryProc = proc
 
         for line in proc.stdout:
-            print(line, end="")    
-            logfile.write(line)      
-            
+            print(line, end="")      # terminal
+            logfile.write(line)      # file
         ret = proc.wait()
 
-    photogrammetryProc = None
-    generating = False
 
+    photogrammetryProc = None
     if ret == 0:
-        dense_model_path = os.path.join(workspace_dir, "dense", "0", "mesh.ply")
-        
-        if os.path.exists(dense_model_path):
-            final_output = os.path.join(output_folder, "model.ply")
-            shutil.move(dense_model_path, final_output)
-            print(f"\n[System] PHOTOGRAMMETRY FINISHED. Saved mesh to: {final_output}")
-        else:
-            print(f"\n[System] Process completed, but could not find the final mesh at standard location inside workspace.")
+        print(f"[System] PHOTOGRAMMETRY FINISHED. Saved to: {output_file}")
     else:
-        print(f"\n[System] COLMAP exited with code {ret}")
+        print(f"[System] Photogrammetry exited with code {ret}")
 
 # Threads
 frames = []

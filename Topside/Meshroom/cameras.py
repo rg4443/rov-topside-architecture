@@ -1,0 +1,353 @@
+import cv2
+from ultralytics import YOLO
+import threading
+import numpy as np
+import pygame
+import os
+import shutil
+import subprocess
+import time
+import csv
+
+image_folder = os.path.abspath("images")
+output_folder = os.path.abspath("output")
+
+# Cache for debugging purposes, will be removed once photogrammetry is completed.
+cache_folder = os.path.abspath("cache")
+os.makedirs(cache_folder, exist_ok=True)
+pipeline = 'photogrammetryDraft'
+ENABLE_LOGGING = True
+interrupt = False
+
+# Remove old dirs (if present) then recreate empty
+for p in (image_folder, output_folder):
+    if os.path.exists(p):
+        try:
+            shutil.rmtree(p)
+        except Exception as e:
+            print(f"Failed to remove {p}: {e}")
+    os.makedirs(p, exist_ok=True)
+
+model = YOLO("best.pt")
+
+# CAMERA SETUP
+class Frame:
+    def __init__(self):
+        self.raw_frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        self.processed_frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        self.lock = threading.Lock()
+        self.latency = time.time()
+        self.inference_time = 0.0
+
+    def set_raw(self, frame, start_time):
+        with self.lock:
+            self.raw_frame = frame.copy()
+            self.latency = start_time
+
+    def set_processed(self, frame, inf_time):
+        with self.lock:
+            self.processed_frame = frame.copy()
+            self.inference_time = inf_time
+
+    def get(self):
+        with self.lock:
+            return self.processed_frame.copy(), self.latency, self.inference_time
+
+    def get_raw(self):
+        with self.lock:
+            return self.raw_frame.copy(), self.latency
+
+def telemetry_logger(frame_list, filename="vision_performance.csv", recovery_file="recovery_performance.csv"):
+    if not ENABLE_LOGGING: return
+    
+    with open(filename, mode='w', newline='') as f:
+        csv.writer(f).writerow(["Timestamp", "Total_AI_Stream_Lat", "Pure_AI_Inference", "Raw_1", "Raw_2", "Raw_3", "FPS"])
+    with open(recovery_file, mode='w', newline='') as f:
+        csv.writer(f).writerow(["Timestamp", "Camera_ID", "Recovery_Duration_Sec"])
+
+    while not interrupt:
+        time.sleep(10)
+        timestamp = time.strftime("%H:%M:%S")
+        now = time.time()
+        
+        data = [f.get() for f in frame_list]
+        total_latencies = [now - d[1] for d in data]
+        pure_inf = data[0][2]  # Only Cam0 has inference time 
+
+        fps = 1.0 / pure_inf if pure_inf > 0 else 0.0
+        
+        row = [timestamp, total_latencies[0], pure_inf] + total_latencies[1:] + [f"{fps:.2f}"]
+        
+        with open(filename, mode='a', newline='') as f:
+            csv.writer(f).writerow(row)
+
+def combine(imgs):
+    img1 = cv2.resize(imgs[0], (1920, 1080))
+    img2 = cv2.resize(imgs[1], (640, 360))
+    img3 = cv2.resize(imgs[2], (640, 360))
+    img4 = cv2.resize(imgs[3], (640, 360))
+    img5 = cv2.hconcat([img2, img3, img4])
+    return cv2.vconcat([img1, img5])
+
+def run_inference(model, frame_obj):
+    global interrupt
+    last_processed_time = 0
+    
+    while not interrupt:
+        f, frame_time = frame_obj.get_raw() 
+        
+        if f is not None and np.any(f) and frame_time != last_processed_time:
+            last_processed_time = frame_time 
+            
+            inf_start = time.time()
+            results = model.predict(f, verbose=False)
+            inf_duration = time.time() - inf_start
+            
+            annotated_frame = results[0].plot()
+            number = len(results[0].boxes)
+            cv2.putText(annotated_frame, f"Green Crabs: {number}", (7, 70), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+            
+            frame_obj.set_processed(annotated_frame, inf_duration)
+        else:
+            time.sleep(0.005)
+
+def run_camera(url, frame_obj, camera_id=0):
+    global interrupt
+    retry_count = 0
+
+    while not interrupt:
+        print(f"[Executive] Initializing Stream {camera_id}...")
+        wait_time = min(retry_count * 2, 10) 
+        if retry_count > 0:
+            print(f"[Executive] Retry {retry_count} for Stream {camera_id} in {wait_time}s...")
+            time.sleep(wait_time)
+
+        recovery_start = time.time() if ENABLE_LOGGING else 0
+        video = cv2.VideoCapture(url)
+        video.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+        last_heartbeat = time.time()
+        timeout_threshold = 2.0 # If no frames for 2 seconds, it's a "Stall"
+        first_frame_received = False
+
+        while not interrupt:
+            start_time = time.time() if ENABLE_LOGGING else 0
+            r, f = video.read()
+            
+            if r and f is not None:
+                if ENABLE_LOGGING and not first_frame_received:
+                    duration = time.time() - recovery_start
+                    with open("recovery_performance.csv", mode='a', newline='') as rf:
+                        csv.writer(rf).writerow([time.strftime("%H:%M:%S"), camera_id, f"{duration:.3f}"])
+                    first_frame_received = True
+
+                frame_obj.set_raw(f, start_time)
+                if camera_id != 0:
+                    frame_obj.set_processed(f, 0.0)
+
+                last_heartbeat = time.time()
+
+            if (time.time() - last_heartbeat) > timeout_threshold:
+                print(f"[Watchdog] Stream {camera_id} HEARTBEAT LOST. Auto-Recovering...")
+                break 
+                
+        video.release()
+        time.sleep(1) 
+        retry_count += 1
+
+# Photogrammetry & Controller
+photogrammetryProc = None
+controller = None
+generating = False
+numPictures = 0
+
+def connect_controller():
+    global controller
+    if pygame.joystick.get_count() > 0 and controller is None:
+        controller = pygame.joystick.Joystick(0)
+        controller.init()
+        print(f'[System] Controller connected: {controller.get_name()}')
+    elif pygame.joystick.get_count() == 0 and controller is not None:
+        print('[System] Controller disconnected')
+        controller = None
+
+def run_photogrammetry():
+    global generating, photogrammetryProc
+    generating = True
+
+    workspace_dir = os.path.join(output_folder, "colmap_workspace")
+    os.makedirs(workspace_dir, exist_ok=True)
+    
+    colmap_path = shutil.which("colmap")
+    if not colmap_path:
+        print("[ERROR] Could not find 'colmap' installed on this system.")
+        print("[Fix] Please run: sudo apt install colmap (on Ubuntu/Debian) or install it via your package manager.")
+        generating = False
+        return
+
+    cmd = [
+        "colmap", "automatic_reconstructor",
+        "--image_path", image_folder,
+        "--workspace_path", workspace_dir,
+        "--data_type", "individual",        
+        "--quality", "medium",              
+        "--use_gpu", "0",                   
+        "--num_threads", "-1"               
+    ]
+
+    print(f"[System] Initializing COLMAP CPU reconstruction...")
+    print(f"[System] Processing may take a while depending on your laptop's CPU.")
+
+    with open("photogrammetry.log", "w") as logfile:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        photogrammetryProc = proc
+
+        for line in proc.stdout:
+            print(line, end="")    
+            logfile.write(line)      
+            
+        ret = proc.wait()
+
+    photogrammetryProc = None
+    generating = False
+
+    if ret == 0:
+        dense_model_path = os.path.join(workspace_dir, "dense", "0", "mesh.ply")
+        
+        if os.path.exists(dense_model_path):
+            final_output = os.path.join(output_folder, "model.ply")
+            shutil.move(dense_model_path, final_output)
+            print(f"\n[System] PHOTOGRAMMETRY FINISHED. Saved mesh to: {final_output}")
+        else:
+            print(f"\n[System] Process completed, but could not find the final mesh at standard location inside workspace.")
+    else:
+        print(f"\n[System] COLMAP exited with code {ret}")
+
+# Threads
+frames = []
+threads = []
+
+# Change depending on amount of cameras available
+urls = [
+    "udp://192.168.2.1:50000?fifo_size=1000000&overrun_nonfatal=1",
+    "udp://192.168.2.1:50001?fifo_size=1000000&overrun_nonfatal=1",
+    "udp://192.168.2.1:50002?fifo_size=1000000&overrun_nonfatal=1",
+    "udp://192.168.2.1:50003?fifo_size=1000000&overrun_nonfatal=1",
+]
+
+for i in range(len(urls)):
+    frames.append(Frame())
+
+    t = threading.Thread(target=run_camera, args=(urls[i], frames[i], i))
+    t.daemon = True 
+    threads.append(t)
+    t.start()
+
+    if i == 0:
+        inf_thread = threading.Thread(target=run_inference, args=(model, frames[i]))
+        inf_thread.daemon = True
+        threads.append(inf_thread) 
+        inf_thread.start()
+
+log_thread = None
+if ENABLE_LOGGING:
+    log_thread = threading.Thread(target=telemetry_logger, args=(frames,))
+    log_thread.daemon = True
+    log_thread.start()
+
+print("[System] All Vision Threads Active.")
+
+# Set up UI / Controllers
+pygame.init()
+pygame.joystick.init()
+connect_controller()
+if controller is None:
+    print("[System] No controller connected. Plug in a controller to use photogrammetry")
+
+pictureWasPressed = True
+generateWasPressed = True
+photogrammetryThread = None
+
+# Main Loop
+try:
+    while not interrupt:
+        raw_data = [f.get() for f in frames]
+        imgs = [data[0] for data in raw_data]
+
+        if len(imgs) == 4:
+            combined = combine(imgs)
+            
+            # Latency Overlay 
+            if ENABLE_LOGGING: 
+                current_latencies = [time.time() - data[1] for data in raw_data]
+                cv2.putText(combined, f"Latency: {current_latencies[0]:.3f}s", (7, 130), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            
+            cv2.imshow('Slugbotics Topside', combined)
+        
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q') or key == ord('Q'): 
+            interrupt = True
+            
+        pygame.event.pump()
+        connect_controller()
+        if controller is not None:
+            picture = bool(controller.get_button(0))   # A Button
+            generate = bool(controller.get_button(1))  # B Button
+            
+            if picture and not pictureWasPressed:
+                print(f"[System] Image saved in images/img{numPictures}.png")
+                filename = os.path.join(image_folder, f'img{numPictures}.jpg')
+
+                # Jpeg for Meshroom
+                success = cv2.imwrite(filename, imgs[0], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+            
+                if success:
+                    print(f"[System] Image successfully saved: {filename}")
+                else:
+                    print(f"[ERROR] Failed to save image to: {filename}. Check folder permissions.")
+                numPictures += 1
+                
+            if generate and not generateWasPressed:
+                if generating:
+                    print('[System] Photogrammetry is already running')
+                else:
+                    photogrammetryThread = threading.Thread(target=run_photogrammetry)
+                    photogrammetryThread.start()
+                    
+            pictureWasPressed, generateWasPressed = picture, generate
+
+except KeyboardInterrupt:
+    print("\n[System] User-initiated interrupt (Ctrl+C). Shutting down...")
+
+except Exception as e:
+    print(f'[CRITICAL ERROR] {e}')
+
+# Cleanup & Shutdown
+finally: 
+    interrupt = True
+    print("[System] Shutdown signaled. Beginning exit.")
+
+    for i, t in enumerate(threads):
+        t.join(timeout=2.0) 
+        print(f"[System] Video Stream {i} released.")
+
+    if photogrammetryThread is not None and photogrammetryThread.is_alive():
+        if photogrammetryProc:
+            print("[System] Killing background photogrammetry process...")
+            photogrammetryProc.kill()
+        photogrammetryThread.join(timeout=2.0)
+
+    if log_thread:
+        log_thread.join(timeout=2.0)
+        print("[System] Telemetry data flushed to disk.")
+
+    cv2.destroyAllWindows()
+    pygame.quit()
+    print("[System] Exit complete.\n")

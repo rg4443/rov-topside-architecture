@@ -140,63 +140,73 @@ def telemetry_logger(sync_dict, interrupt_event, filename="vision_performance.cs
         with open(filename, mode='a', newline='') as f:
             csv.writer(f).writerow(row)
 
-def run_photogrammetry():
-    global generating, photogrammetryProc
-    generating = True
-
-    workspace_dir = os.path.join(output_folder, "colmap_workspace")
+def run_photogrammetry(status_dict):
+    status_dict["generating"] = True
+    workspace_dir = os.path.join(OUTPUT_FOLDER, "colmap_workspace")
+    mvs_dir = os.path.join(OUTPUT_FOLDER, "mvs_workspace")
     os.makedirs(workspace_dir, exist_ok=True)
+    os.makedirs(mvs_dir, exist_ok=True)
     
-    colmap_path = shutil.which("colmap")
-    if not colmap_path:
-        print("[ERROR] Could not find 'colmap' installed on this system.")
-        print("[Fix] Please run: sudo apt install colmap (on Ubuntu/Debian) or install it via your package manager.")
-        generating = False
-        return
+    total_cores = mp.cpu_count()
+    usable_threads = str(max(1, total_cores - 3))
 
-    cmd = [
-        "colmap", "automatic_reconstructor",
-        "--image_path", image_folder,
-        "--workspace_path", workspace_dir,
-        "--data_type", "individual",        
-        "--quality", "medium",              
-        "--use_gpu", "0",                   
-        "--num_threads", "-1"               
-    ]
+    print(f"[System] Starting Photogrammetry, ({usable_threads} threads)...")
 
-    print(f"[System] Initializing COLMAP CPU reconstruction...")
-    print(f"[System] Processing may take a while depending on your laptop's CPU.")
+    try:
+        print("[System] Extracting features and generating sparse map...")
+        subprocess.run([
+            "colmap", "automatic_reconstructor",
+            "--image_path", IMAGE_FOLDER,
+            "--workspace_path", workspace_dir,
+            "--data_type", "individual",
+            "--quality", "medium",
+            "--use_gpu", "0",
+            "--num_threads", usable_threads,
+            "--dense", "0"  # Stop before CUDA is required
+        ], check=True)
 
-    with open("photogrammetry.log", "w") as logfile:
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
-        photogrammetryProc = proc
+        print("[System] Converting workspace to OpenMVS format...")
+        subprocess.run([
+            "InterfaceCOLMAP", 
+            "-i", workspace_dir, 
+            "-o", os.path.join(mvs_dir, "scene.mvs")
+        ], check=True)
 
-        for line in proc.stdout:
-            print(line, end="")    
-            logfile.write(line)      
-            
-        ret = proc.wait()
+        print("[System] Densifying Point Cloud...")
+        subprocess.run([
+            "DensifyPointCloud", 
+            os.path.join(mvs_dir, "scene.mvs"),
+            "--max-threads", usable_threads
+        ], check=True)
 
-    photogrammetryProc = None
-    generating = False
+        print("[System] Reconstructing Mesh geometry...")
+        subprocess.run([
+            "ReconstructMesh", 
+            os.path.join(mvs_dir, "scene_dense.mvs")
+        ], check=True)
 
-    if ret == 0:
-        dense_model_path = os.path.join(workspace_dir, "dense", "0", "mesh.ply")
+        print("[System] Baking Textures...")
+        subprocess.run([
+            "TextureMesh", 
+            os.path.join(mvs_dir, "scene_dense_mesh.mvs")
+        ], check=True)
         
-        if os.path.exists(dense_model_path):
-            final_output = os.path.join(output_folder, "model.ply")
-            shutil.move(dense_model_path, final_output)
-            print(f"\n[System] PHOTOGRAMMETRY FINISHED. Saved mesh to: {final_output}")
+        final_mesh = os.path.join(mvs_dir, "scene_dense_mesh_texture.obj")
+        if os.path.exists(final_mesh):
+            shutil.copy(final_mesh, os.path.join(OUTPUT_FOLDER, "final_model.obj"))
+            print("\n[System] PHOTOGRAMMETRY FINISHED. Final textured model saved.")
         else:
-            print(f"\n[System] Process completed, but could not find the final mesh at standard location inside workspace.")
-    else:
-        print(f"\n[System] COLMAP exited with code {ret}")
+            print("\n[ERROR] Pipeline completed but output file is missing.")
+
+    except subprocess.CalledProcessError as e:
+        print(f"\n[CRITICAL ERROR] Pipeline failed during command execution.")
+        print(f"Command that crashed: {' '.join(e.cmd)}")
+    except FileNotFoundError as e:
+        print(f"\n[ERROR] Missing dependency: {e}")
+        print("[Fix] Ensure both 'colmap' and the OpenMVS binaries (InterfaceCOLMAP, DensifyPointCloud, etc.) are installed and in your system PATH.")
+    finally:
+        status_dict["generating"] = False
+        status_dict["pg_pid"] = None
 
 def combine(imgs):
     img1 = cv2.resize(imgs[0], (1920, 1080))
@@ -241,7 +251,7 @@ if __name__ == '__main__':
     local_views = [np.ndarray(FRAME_SHAPE, dtype=np.uint8, buffer=shm.buf) for shm in shm_buffers[:4]]
     ai_view = np.ndarray(FRAME_SHAPE, dtype=np.uint8, buffer=ai_out_shm.buf)
 
-    urls = [0, 0, 0, 0]  
+    urls = [0, 0, 0, 0]
     processes = []
     for i in range(len(urls)):
         p = mp.Process(target=camera_worker, args=(i, urls[i], cam_shm_names[i], sync_dict, interrupt_event))

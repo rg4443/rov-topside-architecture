@@ -10,7 +10,7 @@ docker run --rm --platform linux/amd64 \
   stream-capture-pipeline \
   /bin/bash -c "
     set -euo pipefail && \
-    python3 test.py && \
+    python3 test_cameras.py && \
     mkdir -p /workspace/output/colmap_workspace/sparse/0 && \
     if [ -f /workspace/output/colmap_workspace/sparse/cameras.bin ]; then \
       cp /workspace/output/colmap_workspace/sparse/*.bin /workspace/output/colmap_workspace/sparse/0/ 2>/dev/null || true; \

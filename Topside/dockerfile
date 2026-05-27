@@ -15,4 +15,4 @@ RUN pip3 install --no-cache-dir opencv-python-headless ultralytics numpy
 WORKDIR /workspace
 COPY . /workspace
 
-CMD ["python3", "test.py"]
+CMD ["python3", "test_cameras.py"]

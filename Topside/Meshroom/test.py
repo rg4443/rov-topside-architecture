@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import time
 import csv
+import threading
+import sys
 
 IMAGE_FOLDER = os.path.abspath("images")
 OUTPUT_FOLDER = os.path.abspath("output")
@@ -19,13 +21,15 @@ FRAME_SIZE_BYTES = np.prod(FRAME_SHAPE) * np.dtype(np.uint8).itemsize
 
 def init_folders():
     os.makedirs(CACHE_FOLDER, exist_ok=True)
-    for p in (IMAGE_FOLDER, OUTPUT_FOLDER):
-        if os.path.exists(p):
-            try:
-                shutil.rmtree(p)
-            except Exception as e:
-                print(f"Failed to remove {p}: {e}")
-        os.makedirs(p, exist_ok=True)
+    
+    if os.path.exists(OUTPUT_FOLDER):
+        try:
+            shutil.rmtree(OUTPUT_FOLDER)
+        except Exception as e:
+            print(f"Failed to remove {OUTPUT_FOLDER}: {e}")
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    
+    os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
 
 def camera_worker(camera_id, url, shm_name, sync_dict, interrupt_event):
@@ -144,13 +148,14 @@ def run_photogrammetry(status_dict):
     status_dict["generating"] = True
     workspace_dir = os.path.join(OUTPUT_FOLDER, "colmap_workspace")
     mvs_dir = os.path.join(OUTPUT_FOLDER, "mvs_workspace")
+    
     os.makedirs(workspace_dir, exist_ok=True)
     os.makedirs(mvs_dir, exist_ok=True)
     
     total_cores = mp.cpu_count()
     usable_threads = str(max(1, total_cores - 3))
 
-    print(f"[System] Starting Photogrammetry, ({usable_threads} threads)...")
+    print(f"[System] Starting Photogrammetry ({usable_threads} threads)...")
 
     try:
         print("[System] Extracting features and generating sparse map...")
@@ -159,54 +164,114 @@ def run_photogrammetry(status_dict):
             "--image_path", IMAGE_FOLDER,
             "--workspace_path", workspace_dir,
             "--data_type", "individual",
+            "--camera_model", "PINHOLE",
+            "--single_camera", "1",
             "--quality", "medium",
             "--use_gpu", "0",
             "--num_threads", usable_threads,
             "--dense", "0"  # Stop before CUDA is required
         ], check=True)
 
-        print("[System] Converting workspace to OpenMVS format...")
+        sparse_zero_dir = os.path.join(workspace_dir, "sparse", "0")
+        os.makedirs(sparse_zero_dir, exist_ok=True)
+        
+        for item in os.listdir(os.path.join(workspace_dir, "sparse")):
+            if item.endswith(".bin") and item != "0":
+                shutil.move(os.path.join(workspace_dir, "sparse", item), os.path.join(sparse_zero_dir, item))
+
+        print("[System] Converting COLMAP model binaries to TXT format...")
+        subprocess.run([
+            "colmap", "model_converter",
+            "--input_path", sparse_zero_dir,
+            "--output_path", os.path.join(workspace_dir, "sparse"),
+            "--output_type", "TXT"
+        ], check=True)
+
+        nested_img_dir = os.path.join(workspace_dir, "workspace", "output", "colmap_workspace")
+        os.makedirs(nested_img_dir, exist_ok=True)
+        for img_file in os.listdir(IMAGE_FOLDER):
+            src_img = os.path.join(IMAGE_FOLDER, img_file)
+            if os.path.isfile(src_img):
+                shutil.copy(src_img, nested_img_dir)
+
+        print("[System] Translating workspace to OpenMVS scene format...")
         subprocess.run([
             "InterfaceCOLMAP", 
-            "-i", workspace_dir, 
-            "-o", os.path.join(mvs_dir, "scene.mvs")
-        ], check=True)
+            "--input-file", workspace_dir, 
+            "--output-file", "scene.mvs",
+            "--image-folder", workspace_dir,
+            "--archive-type", "-1"
+        ], check=True, cwd=mvs_dir)
 
         print("[System] Densifying Point Cloud...")
         subprocess.run([
             "DensifyPointCloud", 
-            os.path.join(mvs_dir, "scene.mvs"),
-            "--max-threads", usable_threads
-        ], check=True)
+            "--input-file", "scene.mvs",
+            "--output-file", "scene_dense.mvs",
+            "--archive-type", "-1"
+        ], check=True, cwd=mvs_dir)
 
         print("[System] Reconstructing Mesh geometry...")
         subprocess.run([
             "ReconstructMesh", 
-            os.path.join(mvs_dir, "scene_dense.mvs")
-        ], check=True)
+            "--input-file", "scene_dense.mvs",
+            "--output-file", "scene_dense_mesh.mvs",
+            "--archive-type", "-1"
+        ], check=True, cwd=mvs_dir)
 
         print("[System] Baking Textures...")
         subprocess.run([
             "TextureMesh", 
-            os.path.join(mvs_dir, "scene_dense_mesh.mvs")
-        ], check=True)
+            "--input-file", "scene_dense_mesh.mvs",
+            "--output-file", "scene_dense_mesh_texture.mvs",
+            "--export-type", "obj",
+            "--archive-type", "-1"
+        ], check=True, cwd=mvs_dir)
         
-        final_mesh = os.path.join(mvs_dir, "scene_dense_mesh_texture.obj")
-        if os.path.exists(final_mesh):
-            shutil.copy(final_mesh, os.path.join(OUTPUT_FOLDER, "final_model.obj"))
-            print("\n[System] PHOTOGRAMMETRY FINISHED. Final textured model saved.")
+        final_mesh_obj = os.path.join(mvs_dir, "scene_dense_mesh_texture.obj")
+        final_mesh_mtl = os.path.join(mvs_dir, "scene_dense_mesh_texture.mtl")
+        
+        if os.path.exists(final_mesh_obj):
+            shutil.copy(final_mesh_obj, os.path.join(OUTPUT_FOLDER, "final_model.obj"))
+            shutil.copy(final_mesh_mtl, os.path.join(OUTPUT_FOLDER, "final_model.mtl"))
+            
+            for file in os.listdir(mvs_dir):
+                if file.startswith("scene_dense_mesh_texture_material_0_map_Kd"):
+                    ext = file.split('.')[-1]
+                    shutil.copy(
+                        os.path.join(mvs_dir, file), 
+                        os.path.join(OUTPUT_FOLDER, f"final_model_material_0_map_Kd.{ext}")
+                    )
+                    break
+            
+            obj_path = os.path.join(OUTPUT_FOLDER, "final_model.obj")
+            with open(obj_path, 'r') as f:
+                obj_content = f.read()
+            obj_content = obj_content.replace("scene_dense_mesh_texture.mtl", "final_model.mtl")
+            with open(obj_path, 'w') as f:
+                f.write(obj_content)
+
+            mtl_path = os.path.join(OUTPUT_FOLDER, "final_model.mtl")
+            with open(mtl_path, 'r') as f:
+                mtl_content = f.read()
+            mtl_content = mtl_content.replace("scene_dense_mesh_texture_material_0_map_Kd", "final_model_material_0_map_Kd")
+            with open(mtl_path, 'w') as f:
+                f.write(mtl_content)
+
+            print("\n[System] PHOTOGRAMMETRY COMPLETE: final_model.obj is ready in output/ folder!")
         else:
-            print("\n[ERROR] Pipeline completed but output file is missing.")
+            print("\n[ERROR] Pipeline completed but output mesh file is missing.")
+            status_dict["failed"] = True
 
     except subprocess.CalledProcessError as e:
-        print(f"\n[CRITICAL ERROR] Pipeline failed during command execution.")
+        status_dict["failed"] = True
+        print(f"\n[CRITICAL ERROR] Pipeline failed during binary execution.")
         print(f"Command that crashed: {' '.join(e.cmd)}")
     except FileNotFoundError as e:
-        print(f"\n[ERROR] Missing dependency: {e}")
-        print("[Fix] Ensure both 'colmap' and the OpenMVS binaries (InterfaceCOLMAP, DensifyPointCloud, etc.) are installed and in your system PATH.")
+        status_dict["failed"] = True
+        print(f"\n[ERROR] Missing binary dependency: {e}")
     finally:
         status_dict["generating"] = False
-        status_dict["pg_pid"] = None
 
 def combine(imgs):
     img1 = cv2.resize(imgs[0], (1920, 1080))
@@ -227,7 +292,7 @@ if __name__ == '__main__':
     interrupt_event = mp.Event()
     manager = mp.Manager()
     sync_dict = manager.dict()
-    status_dict = manager.dict({"generating": False, "pg_pid": None})
+    status_dict = manager.dict({"generating": False, "pg_pid": None, "failed": False})
     
     for i in range(4):
         sync_dict[f"lat_{i}"] = time.time()
@@ -271,7 +336,7 @@ if __name__ == '__main__':
         log_proc.start()
 
     print("[System] All Vision Processes Active.")
-    print("[System] Controls: 'p' = Take Picture | 'g' = Start Photogrammetry | 'q' = Quit")
+    print("[System] Commencing Automated Headless Test...")
 
     numPictures = 0
     pg_thread = None
@@ -313,10 +378,27 @@ if __name__ == '__main__':
                     pg_thread.daemon = True
                     pg_thread.start()
 
+        if not status_dict["generating"]:
+            pg_thread = threading.Thread(target=run_photogrammetry, args=(status_dict,))
+            pg_thread.daemon = True
+            pg_thread.start()
+
+        time.sleep(0.5)
+
+        while status_dict["generating"]:
+            time.sleep(2) 
+
+        if status_dict.get("failed", False):
+            raise RuntimeError("Photogrammetry stage failed")
+
+        print("\n[System] Photogrammetry test complete! Check your local output/ folder.")
+        interrupt_event.set()
+
     except KeyboardInterrupt:
         print("\n[System] User-initiated interrupt (Ctrl+C). Shutting down...")
     except Exception as e:
         print(f'[CRITICAL ERROR] {e}')
+        sys.exit(1)
     finally:
         print("[System] Shutdown signaled. Terminating processes...")
         interrupt_event.set()

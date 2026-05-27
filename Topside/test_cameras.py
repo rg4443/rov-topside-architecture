@@ -34,7 +34,7 @@ def init_folders():
 
 def camera_worker(camera_id, url, shm_name, sync_dict, interrupt_event):
     """
-    Isolated process capturing video frames and pushing them directly 
+    Isolated process capturing video frames and pushing them directly
     into Shared Memory via a non-allocating memory copy.
     """
     print(f"[Executive] Initializing Stream {camera_id}...")
@@ -72,7 +72,7 @@ def camera_worker(camera_id, url, shm_name, sync_dict, interrupt_event):
             if (time.time() - last_heartbeat) > timeout_threshold:
                 print(f"[Watchdog] Stream {camera_id} HEARTBEAT LOST.")
                 time.sleep(1.0)
-                last_heartbeat = time.time() 
+                last_heartbeat = time.time()
                 
     finally:
         video.release()
@@ -107,13 +107,13 @@ def inference_worker(raw_shm_name, out_shm_name, sync_dict, interrupt_event):
                 
                 annotated = results[0].plot()
                 number = len(results[0].boxes)
-                cv2.putText(annotated, f"Green Crabs: {number}", (7, 70), 
+                cv2.putText(annotated, f"Green Crabs: {number}", (7, 70),
                             cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
                 
                 np.copyto(out_array, annotated)
                 sync_dict["inference_time"] = inf_duration
             else:
-                time.sleep(0.002) 
+                time.sleep(0.002)
                 
     finally:
         raw_shm.close()
@@ -196,8 +196,8 @@ def run_photogrammetry(status_dict):
 
         print("[System] Translating workspace to OpenMVS scene format...")
         subprocess.run([
-            "InterfaceCOLMAP", 
-            "--input-file", workspace_dir, 
+            "InterfaceCOLMAP",
+            "--input-file", workspace_dir,
             "--output-file", "scene.mvs",
             "--image-folder", workspace_dir,
             "--archive-type", "-1"
@@ -205,7 +205,7 @@ def run_photogrammetry(status_dict):
 
         print("[System] Densifying Point Cloud...")
         subprocess.run([
-            "DensifyPointCloud", 
+            "DensifyPointCloud",
             "--input-file", "scene.mvs",
             "--output-file", "scene_dense.mvs",
             "--archive-type", "-1"
@@ -213,7 +213,7 @@ def run_photogrammetry(status_dict):
 
         print("[System] Reconstructing Mesh geometry...")
         subprocess.run([
-            "ReconstructMesh", 
+            "ReconstructMesh",
             "--input-file", "scene_dense.mvs",
             "--output-file", "scene_dense_mesh.mvs",
             "--archive-type", "-1"
@@ -221,7 +221,7 @@ def run_photogrammetry(status_dict):
 
         print("[System] Baking Textures...")
         subprocess.run([
-            "TextureMesh", 
+            "TextureMesh",
             "--input-file", "scene_dense_mesh.mvs",
             "--output-file", "scene_dense_mesh_texture.mvs",
             "--export-type", "obj",
@@ -239,7 +239,7 @@ def run_photogrammetry(status_dict):
                 if file.startswith("scene_dense_mesh_texture_material_0_map_Kd"):
                     ext = file.split('.')[-1]
                     shutil.copy(
-                        os.path.join(mvs_dir, file), 
+                        os.path.join(mvs_dir, file),
                         os.path.join(OUTPUT_FOLDER, f"final_model_material_0_map_Kd.{ext}")
                     )
                     break

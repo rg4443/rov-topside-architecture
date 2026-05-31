@@ -25,6 +25,11 @@ COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libopencv_*.so* /usr/local/
 
 COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libtbb.so* /usr/local/lib/openmvs_libs/
 
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libwebp*.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libjpeg*.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libpng*.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libtiff*.so* /usr/local/lib/openmvs_libs/
+
 ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/lib/openmvs_libs:${LD_LIBRARY_PATH}"
 

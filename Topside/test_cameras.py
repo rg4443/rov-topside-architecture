@@ -146,9 +146,9 @@ def telemetry_logger(sync_dict, interrupt_event, filename="vision_performance.cs
 
 clean_openmvs_env = os.environ.copy()
 if "LD_LIBRARY_PATH" in clean_openmvs_env:
-    paths = clean_openmvs_env(["LD_LIBRARY_PATH"]).split(":")
+    paths = clean_openmvs_env["LD_LIBRARY_PATH"].split(":")
     clean_paths = [p for p in paths if "openmvs_libs" not in p]
-    clean_openmvs_env(["LD_LIBRARY_PATH"]) = ":".join(clean_paths)
+    clean_openmvs_env["LD_LIBRARY_PATH"] = ":".join(clean_paths)
 
 openmvs_env = os.environ.copy()
 openmvs_env["LD_LIBRARY_PATH"] = f"/usr/local/lib/openmvs_libs:{openmvs_env.get('LD_LIBRARY_PATH', '')}"

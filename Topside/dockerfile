@@ -30,6 +30,8 @@ COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libjpeg*.so* /usr/local/lib
 COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libpng*.so* /usr/local/lib/openmvs_libs/
 COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libtiff*.so* /usr/local/lib/openmvs_libs/
 
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libgdcm*.so* /usr/local/lib/openmvs_libs/
+
 ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
 
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel

@@ -4,14 +4,27 @@ FROM --platform=linux/amd64 openmvs/openmvs-ubuntu:latest AS library_collector
 
 RUN mkdir -p /isolated_libs
 
-RUN for bin in /usr/local/bin/OpenMVS/*; do \
-        ldd "$bin" | grep "=>" \
-        | grep -vE "libc.so|libm.so|libpthread.so|libdl.so|librt.so|libstdc\+\+|libgcc_s|ld-linux" \
-        | awk '{print \$3}' \
-        | xargs -I {} cp -L {} /isolated_libs/ 2>/dev/null || true; \
-    done
-
+RUN cp -L /usr/local/bin/OpenMVS/* /isolated_libs/ 2>/dev/null || true
 RUN cp -L /usr/lib/libgdal*.so* /isolated_libs/ 2>/dev/null || true
+
+RUN echo "Starting recursive dependency crawler..." && \
+    while true; do \
+        BEFORE_COUNT=$(ls /isolated_libs | wc -l); \
+        \
+        for file in /isolated_libs/*; do \
+            ldd "$file" 2>/dev/null | grep "=> /" \
+            | grep -vE "libc.so|libm.so|libpthread.so|libdl.so|librt.so|libstdc\+\+|libgcc_s|ld-linux" \
+            | awk '{print \$3}' \
+            | xargs -I {} cp -n -L {} /isolated_libs/ 2>/dev/null || true; \
+        done; \
+        \
+        AFTER_COUNT=$(ls /isolated_libs | wc -l); \
+        \
+        if [ "$BEFORE_COUNT" -eq "$AFTER_COUNT" ]; then \
+            echo "Dependency tree fully resolved. Total files gathered: $AFTER_COUNT"; \
+            break; \
+        fi; \
+    done
 
 FROM --platform=linux/amd64 ubuntu:22.04
 
@@ -31,11 +44,9 @@ COPY --from=library_collector /isolated_libs /usr/local/lib/openmvs_libs
 ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
 
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
-
 RUN pip3 install --no-cache-dir opencv-python numpy ultralytics
 
 WORKDIR /workspace
-RUN mkdir -p /workspace/workspace
 COPY . /workspace
 
 CMD ["python3", "test_cameras.py"]

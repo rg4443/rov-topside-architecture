@@ -39,6 +39,9 @@ COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libIlmThread*.so* /usr/loca
 COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libxerces-c*.so* /usr/local/lib/openmvs_libs/
 COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libImath*.so* /usr/local/lib/openmvs_libs/
 COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libgomp.so.1* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libgdal*.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libCharLS*.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libjson-c*.so* /usr/local/lib/openmvs_libs/
 
 ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
 

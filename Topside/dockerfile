@@ -1,4 +1,6 @@
-FROM --platform=linux/amd64 openmvs/openmvs-ubuntu:latest
+FROM --platform=linux/amd64 openmvs/openmvs-ubuntu:latest AS openmvs_source
+
+FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -10,8 +12,11 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+COPY --from=openmvs_source /usr/local/bin/OpenMVS /usr/local/bin/OpenMVS
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu /usr/local/lib/openmvs_libs
+
 ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
-ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/lib/openmvs_libs:${LD_LIBRARY_PATH}"
 
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 

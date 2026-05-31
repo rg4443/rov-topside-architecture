@@ -144,6 +144,12 @@ def telemetry_logger(sync_dict, interrupt_event, filename="vision_performance.cs
         with open(filename, mode='a', newline='') as f:
             csv.writer(f).writerow(row)
 
+clean_openmvs_env = os.environ.copy()
+if "LD_LIBRARY_PATH" in clean_openmvs_env:
+    paths = clean_openmvs_env(["LD_LIBRARY_PATH"]).split(":")
+    clean_paths = [p for p in paths if "openmvs_libs" not in p]
+    clean_openmvs_env(["LD_LIBRARY_PATH"]) = ":".join(clean_paths)
+
 openmvs_env = os.environ.copy()
 openmvs_env["LD_LIBRARY_PATH"] = f"/usr/local/lib/openmvs_libs:{openmvs_env.get('LD_LIBRARY_PATH', '')}"
 
@@ -190,7 +196,7 @@ def run_photogrammetry(status_dict):
             "--input_path", sparse_zero_dir,
             "--output_path", os.path.join(workspace_dir, "sparse"),
             "--output_type", "TXT"
-        ], check=True, cwd=mvs_dir, env=openmvs_env)
+        ], check=True, env=clean_openmvs_env)
 
         nested_img_dir = os.path.join(workspace_dir, "workspace", "output", "colmap_workspace")
         os.makedirs(nested_img_dir, exist_ok=True)

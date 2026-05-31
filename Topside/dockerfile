@@ -1,6 +1,4 @@
-FROM --platform=linux/amd64 openmvs/openmvs-ubuntu:latest AS openmvs_source
-
-FROM --platform=linux/amd64 ubuntu:22.04
+FROM --platform=linux/amd64 openmvs/openmvs-ubuntu:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -10,23 +8,9 @@ RUN apt-get update && apt-get install -y \
     colmap \
     libgl1-mesa-glx \
     libglib2.0-0 \
-    libboost-program-options1.74.0 \
-    libboost-serialization1.74.0 \
-    libboost-filesystem1.74.0 \
-    libboost-system1.74.0 \
-    libopencv-core4.5d \
-    libgoogle-glog0v5 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=openmvs_source /usr/local/bin/OpenMVS/InterfaceCOLMAP /usr/local/bin/
-COPY --from=openmvs_source /usr/local/bin/OpenMVS/DensifyPointCloud /usr/local/bin/
-COPY --from=openmvs_source /usr/local/bin/OpenMVS/ReconstructMesh /usr/local/bin/
-COPY --from=openmvs_source /usr/local/bin/OpenMVS/TextureMesh /usr/local/bin/
-
-COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/ /usr/local/lib/
-COPY --from=openmvs_source /usr/local/lib/ /usr/local/lib/
-
-ENV PATH="/usr/local/bin:${PATH}"
+ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
 
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel

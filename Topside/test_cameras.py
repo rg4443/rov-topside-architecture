@@ -148,6 +148,7 @@ def run_photogrammetry(status_dict):
     status_dict["generating"] = True
     workspace_dir = os.path.join(OUTPUT_FOLDER, "colmap_workspace")
     mvs_dir = os.path.join(OUTPUT_FOLDER, "mvs_workspace")
+    abs_images = os.path.abspath(IMAGE_FOLDER)    
     
     os.makedirs(workspace_dir, exist_ok=True)
     os.makedirs(mvs_dir, exist_ok=True)
@@ -196,16 +197,16 @@ def run_photogrammetry(status_dict):
 
         print("[System] Translating workspace to OpenMVS scene format...")
         subprocess.run([
-            "InterfaceCOLMAP",
+            "/usr/local/bin/InterfaceCOLMAP",
             "--input-file", workspace_dir,
             "--output-file", "scene.mvs",
-            "--image-folder", workspace_dir,
+            "--image-folder", abs_images,
             "--archive-type", "-1"
         ], check=True, cwd=mvs_dir)
 
         print("[System] Densifying Point Cloud...")
         subprocess.run([
-            "DensifyPointCloud",
+            "/usr/local/bin/DensifyPointCloud",
             "--input-file", "scene.mvs",
             "--output-file", "scene_dense.mvs",
             "--archive-type", "-1"
@@ -213,7 +214,7 @@ def run_photogrammetry(status_dict):
 
         print("[System] Reconstructing Mesh geometry...")
         subprocess.run([
-            "ReconstructMesh",
+            "/usr/local/bin/ReconstructMesh",
             "--input-file", "scene_dense.mvs",
             "--output-file", "scene_dense_mesh.mvs",
             "--archive-type", "-1"
@@ -221,7 +222,7 @@ def run_photogrammetry(status_dict):
 
         print("[System] Baking Textures...")
         subprocess.run([
-            "TextureMesh",
+            "/usr/local/bin/TextureMesh",
             "--input-file", "scene_dense_mesh.mvs",
             "--output-file", "scene_dense_mesh_texture.mvs",
             "--export-type", "obj",

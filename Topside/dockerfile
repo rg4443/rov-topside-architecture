@@ -42,6 +42,8 @@ COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libgomp.so.1* /usr/local/li
 COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libgdal*.so* /usr/local/lib/openmvs_libs/
 COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libCharLS*.so* /usr/local/lib/openmvs_libs/
 COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libjson-c*.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1 /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libssl.so.1.1 /usr/local/lib/openmvs_libs/
 
 ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
 

@@ -13,7 +13,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=openmvs_source /usr/local/bin/OpenMVS /usr/local/bin/OpenMVS
-COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu /usr/local/lib/openmvs_libs
+COPY --from=openmvs_source /usr/local/lib /usr/local/lib/openmvs_libs
+
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libboost_program_options.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libboost_serialization.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libboost_filesystem.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libboost_system.so* /usr/local/lib/openmvs_libs/
+COPY --from=openmvs_source /usr/lib/x86_64-linux-gnu/libboost_iostreams.so* /usr/local/lib/openmvs_libs/
 
 ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/lib/openmvs_libs:${LD_LIBRARY_PATH}"

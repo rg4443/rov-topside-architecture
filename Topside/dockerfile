@@ -14,7 +14,7 @@ RUN echo "$OPENMVS_LIB" > /etc/ld.so.conf.d/openmvs.conf && ldconfig
 SHELL ["/bin/bash", "-c"]
 
 RUN set -euo pipefail; \
-    echo ">>> Looking through every openmvs binary."; \
+    echo "Looking through every openmvs binary."; \
     : > /tmp/queue;        \
     : > /tmp/visited;      \
     : > /tmp/missing;      \
@@ -24,7 +24,7 @@ RUN set -euo pipefail; \
         [ -f "$bin" ] && [ -x "$bin" ] && echo "$bin" >> /tmp/queue; \
     done; \
     \
-    echo ">>> Closing the passing dependencies."; \
+    echo "Closing the passing dependencies."; \
     while [ -s /tmp/queue ]; do \
         target="$(head -n1 /tmp/queue)"; \
         sed -i '1d' /tmp/queue; \
@@ -47,7 +47,7 @@ RUN set -euo pipefail; \
             fi; \
             \
             if [ -n "$path" ] && [ -e "$path" ]; then \
-                cp -Ln "$path" "/isolated_libs/$soname" 2>/dev/null || true; \
+                cp -Lf "$path" "/isolated_libs/$soname"; \
                 echo "$path" >> /tmp/queue; \
             else \
                 echo "$soname" >> /tmp/missing; \
@@ -55,13 +55,13 @@ RUN set -euo pipefail; \
         done; \
     done; \
     \
-    echo ">>> Collected $(ls /isolated_libs | wc -l) shared libraries."; \
+    echo "Collected $(ls /isolated_libs | wc -l) shared libraries."; \
     if [ -s /tmp/missing ]; then \
         echo "CRITICAL: The following sonames could not be resolved:"; \
         sort -u /tmp/missing; \
         exit 1; \
     else \
-        echo ">>> Everything is fine."; \
+        echo "Everything is fine."; \
     fi
 
 FROM --platform=linux/amd64 ubuntu:22.04
@@ -84,7 +84,7 @@ RUN echo "/usr/local/lib/openmvs_libs" > /etc/ld.so.conf.d/openmvs.conf && ldcon
 ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/lib/openmvs_libs"
 
-RUN echo ">>> Verifying openmvs binaries..." && \
+RUN echo "Verifying openmvs binaries..." && \
     miss=0; \
     for bin in /usr/local/bin/OpenMVS/*; do \
         if ldd "$bin" 2>/dev/null | grep -q "not found"; then \
@@ -93,7 +93,7 @@ RUN echo ">>> Verifying openmvs binaries..." && \
             miss=1; \
         fi; \
     done; \
-    [ "$miss" -eq 0 ] && echo ">>> All openmvs binaries are satisfied." || \
+    [ "$miss" -eq 0 ] && echo "All openmvs binaries are satisfied." || \
         (echo "Unmet dependencies remain." && exit 1)
 
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel

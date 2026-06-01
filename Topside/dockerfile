@@ -41,7 +41,8 @@ RUN set -euo pipefail; \
             if [ -z "$path" ] || [ "$path" = "not" ]; then \
                 resolved="$(ldconfig -p | grep -F "$soname" | head -n1 | awk '{print $NF}')"; \
                 if [ -z "$resolved" ]; then \
-                    resolved="$(find / -name "$soname" -type f 2>/dev/null | head -n1)"; \
+                    # 🛠️ FIXED: Removed "-type f" so it successfully harvests symbolic links
+                    resolved="$(find / -name "$soname" 2>/dev/null | head -n1)"; \
                 fi; \
                 path="$resolved"; \
             fi; \
@@ -57,8 +58,9 @@ RUN set -euo pipefail; \
     \
     echo ">>> Collected $(ls /isolated_libs | wc -l) shared libraries."; \
     if [ -s /tmp/missing ]; then \
-        echo ":( The following sonames could not be resolved:"; \
+        echo "CRITICAL: The following sonames could not be resolved:"; \
         sort -u /tmp/missing; \
+        exit 1; \
     else \
         echo ">>> Everything is fine."; \
     fi

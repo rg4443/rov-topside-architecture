@@ -34,7 +34,7 @@ RUN set -euo pipefail; \
         \
         ldd "$target" 2>/dev/null | while read -r line; do \
             soname="$(echo "$line" | awk '{print $1}')"; \
-            path="$(echo "$line"   | awk '{if ($2 == \"=>\") print $3; else print $1}')"; \
+            path="$(echo "$line"   | awk '{if ($2 == "=>") print $3; else print $1}')"; \
             \
             echo "$soname" | grep -qE "$SKIP" && continue; \
             \

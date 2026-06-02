@@ -80,17 +80,14 @@ RUN apt-get update && apt-get install -y \
 COPY --from=openmvs_source    /usr/local/bin/OpenMVS /usr/local/bin/OpenMVS
 COPY --from=library_collector /isolated_libs         /usr/local/lib/openmvs_libs
 
-RUN echo "/usr/local/lib/openmvs_libs" > /etc/ld.so.conf.d/openmvs.conf && ldconfig
-
 ENV PATH="/usr/local/bin/OpenMVS:${PATH}"
-ENV LD_LIBRARY_PATH="/usr/local/lib/openmvs_libs"
 
 RUN echo "Verifying openmvs binaries..." && \
     miss=0; \
     for bin in /usr/local/bin/OpenMVS/*; do \
-        if ldd "$bin" 2>/dev/null | grep -q "not found"; then \
+        if LD_LIBRARY_PATH=/usr/local/lib/openmvs_libs ldd "$bin" 2>/dev/null | grep -q "not found"; then \
             echo "Missing dependencies in $bin:"; \
-            ldd "$bin" | grep "not found"; \
+            LD_LIBRARY_PATH=/usr/local/lib/openmvs_libs ldd "$bin" | grep "not found"; \
             miss=1; \
         fi; \
     done; \

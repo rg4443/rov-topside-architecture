@@ -181,7 +181,7 @@ def run_photogrammetry(status_dict):
             "--use_gpu", "0",
             "--num_threads", usable_threads,
             "--dense", "0"  # Stop before CUDA is required
-        ], check=True)
+        ], check=True, env=clean_openmvs_env)
 
         sparse_zero_dir = os.path.join(workspace_dir, "sparse", "0")
         os.makedirs(sparse_zero_dir, exist_ok=True)
@@ -228,7 +228,7 @@ def run_photogrammetry(status_dict):
             "--input-file", "scene_dense.mvs",
             "--output-file", "scene_dense_mesh.mvs",
             "--archive-type", "-1"
-        ], check=True, cwd=mvs_dir)
+        ], check=True, cwd=mvs_dir, env=openmvs_env)
 
         print("[System] Baking Textures...")
         subprocess.run([
@@ -237,7 +237,7 @@ def run_photogrammetry(status_dict):
             "--output-file", "scene_dense_mesh_texture.mvs",
             "--export-type", "obj",
             "--archive-type", "-1"
-        ], check=True, cwd=mvs_dir)
+        ], check=True, cwd=mvs_dir, env=openmvs_env)
         
         final_mesh_obj = os.path.join(mvs_dir, "scene_dense_mesh_texture.obj")
         final_mesh_mtl = os.path.join(mvs_dir, "scene_dense_mesh_texture.mtl")

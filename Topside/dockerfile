@@ -18,26 +18,10 @@ RUN set -euo pipefail; \
     : > /tmp/queue;        \
     : > /tmp/visited;      \
     : > /tmp/missing;      \
-    SKIP='^(libc|libm|libpthread|libdl|librt|libstdc\+\+|libgcc_s|ld-linux|linux-vdso|statically)'; \
+    SKIP='^(libc\.so|libm\.so|libpthread\.so|libdl\.so|librt\.so|libstdc\+\+\.so|libgcc_s\.so|ld-linux|linux-vdso|statically)'; \
     \
     for bin in "$OPENMVS_BIN"/*; do \
         [ -f "$bin" ] && [ -x "$bin" ] && echo "$bin" >> /tmp/queue; \
-    done; \
-    \
-    echo "Pre-seeding original 5 libraries the dfs cannot find."; \
-    for lib_path in \
-        /usr/lib/x86_64-linux-gnu/libmfhdfalt.so.0 \
-        /usr/lib/x86_64-linux-gnu/libdfalt.so.0 \
-        /usr/lib/x86_64-linux-gnu/libcurl-gnutls.so.4 \
-        /usr/lib/x86_64-linux-gnu/libmysqlclient.so.20 \
-        /usr/lib/x86_64-linux-gnu/libminizip.so.1 \
-        /lib/x86_64-linux-gnu/libcrypto.so.1.1 \
-        /lib/x86_64-linux-gnu/libssl.so.1.1; \
-    do \
-        if [ -e "$lib_path" ]; then \
-            cp -Lf "$lib_path" "/isolated_libs/$(basename "$lib_path")"; \
-            echo "$lib_path" >> /tmp/queue; \
-        fi; \
     done; \
     \
     echo "Closing the passing dependencies."; \
@@ -66,8 +50,6 @@ RUN set -euo pipefail; \
             if [ -n "$path" ] && [ -e "$path" ]; then \
                 cp -Lf "$path" "/isolated_libs/$soname" 2>/dev/null || true; \
                 echo "$path" >> /tmp/queue; \
-            elif [ -e "/isolated_libs/$soname" ]; then \
-                continue; \
             else \
                 echo "$soname" >> /tmp/missing; \
             fi; \

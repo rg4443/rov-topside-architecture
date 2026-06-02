@@ -190,7 +190,7 @@ def run_photogrammetry(status_dict):
             if item.endswith(".bin") and item != "0":
                 shutil.move(os.path.join(workspace_dir, "sparse", item), os.path.join(sparse_zero_dir, item))
 
-        print("[System] Converting COLMAP model binaries to TXT format...")
+                print("[System] Converting COLMAP model binaries to TXT format...")
         subprocess.run([
             "colmap", "model_converter",
             "--input_path", sparse_zero_dir,
@@ -198,12 +198,17 @@ def run_photogrammetry(status_dict):
             "--output_type", "TXT"
         ], check=True, env=clean_openmvs_env)
 
-        nested_img_dir = os.path.join(workspace_dir, "workspace", "output", "colmap_workspace")
+        nested_img_dir = os.path.join(workspace_dir, "workspace", "images")
         os.makedirs(nested_img_dir, exist_ok=True)
+        
+        legacy_nested_dir = os.path.join(workspace_dir, "workspace", "output", "colmap_workspace")
+        os.makedirs(legacy_nested_dir, exist_ok=True)
+
         for img_file in os.listdir(IMAGE_FOLDER):
             src_img = os.path.join(IMAGE_FOLDER, img_file)
             if os.path.isfile(src_img):
                 shutil.copy(src_img, nested_img_dir)
+                shutil.copy(src_img, legacy_nested_dir)
 
         print("[System] Translating workspace to OpenMVS scene format...")
         subprocess.run([

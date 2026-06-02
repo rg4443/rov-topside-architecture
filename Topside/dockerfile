@@ -34,6 +34,7 @@ RUN set -euo pipefail; \
         \
         ldd "$target" 2>/dev/null | while read -r line; do \
             soname="$(echo "$line" | awk '{print $1}')"; \
+            soname="$(basename "$soname")"; \
             path="$(echo "$line"   | awk '{if ($2 == "=>") print $3; else print $1}')"; \
             \
             echo "$soname" | grep -qE "$SKIP" && continue; \
@@ -55,13 +56,13 @@ RUN set -euo pipefail; \
         done; \
     done; \
     \
-    echo "Collected $(ls /isolated_libs | wc -l) shared libraries."; \
+    echo ">>> Collected $(ls /isolated_libs | wc -l) shared libraries."; \
     if [ -s /tmp/missing ]; then \
         echo "CRITICAL: The following sonames could not be resolved:"; \
         sort -u /tmp/missing; \
         exit 1; \
     else \
-        echo "Everything is fine."; \
+        echo ">>> Everything is fine."; \
     fi
 
 FROM --platform=linux/amd64 ubuntu:22.04

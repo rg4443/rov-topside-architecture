@@ -56,13 +56,20 @@ RUN set -euo pipefail; \
         done; \
     done; \
     \
-    echo ">>> Collected $(ls /isolated_libs | wc -l) shared libraries."; \
+    echo ">>> Executing absolute safety-net sweep for core targets..."; \
+    for lib in libmfhdfalt.so.0 libcurl-gnutls.so.4 libmysqlclient.so.20 libcrypto.so.1.1 libminizip.so.1; do \
+        find / -name "$lib" 2>/dev/null | while read -r target_path; do \
+            cp -Lf "$target_path" "/isolated_libs/$lib"; \
+        done; \
+    done; \
+    \
+    echo "Collected $(ls /isolated_libs | wc -l) shared libraries."; \
     if [ -s /tmp/missing ]; then \
         echo "CRITICAL: The following sonames could not be resolved:"; \
         sort -u /tmp/missing; \
         exit 1; \
     else \
-        echo ">>> Everything is fine."; \
+        echo "Everything is fine."; \
     fi
 
 FROM --platform=linux/amd64 ubuntu:22.04

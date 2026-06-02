@@ -24,6 +24,22 @@ RUN set -euo pipefail; \
         [ -f "$bin" ] && [ -x "$bin" ] && echo "$bin" >> /tmp/queue; \
     done; \
     \
+    echo "Pre-seeding original 5 libraries the dfs cannot find."; \
+    for lib_path in \
+        /usr/lib/x86_64-linux-gnu/libmfhdfalt.so.0 \
+        /usr/lib/x86_64-linux-gnu/libdfalt.so.0 \
+        /usr/lib/x86_64-linux-gnu/libcurl-gnutls.so.4 \
+        /usr/lib/x86_64-linux-gnu/libmysqlclient.so.20 \
+        /usr/lib/x86_64-linux-gnu/libminizip.so.1 \
+        /lib/x86_64-linux-gnu/libcrypto.so.1.1 \
+        /lib/x86_64-linux-gnu/libssl.so.1.1; \
+    do \
+        if [ -e "$lib_path" ]; then \
+            cp -Lf "$lib_path" "/isolated_libs/$(basename "$lib_path")"; \
+            echo "$lib_path" >> /tmp/queue; \
+        fi; \
+    done; \
+    \
     echo "Closing the passing dependencies."; \
     while [ -s /tmp/queue ]; do \
         target="$(head -n1 /tmp/queue)"; \
@@ -48,24 +64,19 @@ RUN set -euo pipefail; \
             fi; \
             \
             if [ -n "$path" ] && [ -e "$path" ]; then \
-                cp -Lf "$path" "/isolated_libs/$soname"; \
+                cp -Lf "$path" "/isolated_libs/$soname" 2>/dev/null || true; \
                 echo "$path" >> /tmp/queue; \
+            elif [ -e "/isolated_libs/$soname" ]; then \
+                continue; \
             else \
                 echo "$soname" >> /tmp/missing; \
             fi; \
         done; \
     done; \
     \
-    echo ">>> Executing absolute safety-net sweep for core targets..."; \
-    for lib in libmfhdfalt.so.0 libcurl-gnutls.so.4 libmysqlclient.so.20 libcrypto.so.1.1 libminizip.so.1; do \
-        find / -name "$lib" 2>/dev/null | while read -r target_path; do \
-            cp -Lf "$target_path" "/isolated_libs/$lib"; \
-        done; \
-    done; \
-    \
     echo "Collected $(ls /isolated_libs | wc -l) shared libraries."; \
     if [ -s /tmp/missing ]; then \
-        echo "CRITICAL: The following sonames could not be resolved:"; \
+        echo "The following sonames could not be resolved:"; \
         sort -u /tmp/missing; \
         exit 1; \
     else \

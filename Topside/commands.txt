@@ -1,0 +1,1 @@
+flatpak install https://dl.flathub.org/repo/appstream/net.meshlab.MeshLab.flatpakref

@@ -29,7 +29,7 @@ class ClawController:
         """Establish a connection to the BlueOS internal MAVLink router."""
         try:
             logger.info("Attempting to connect to BlueOS MAVLink stream (udpin:0.0.0.0:14550)...")
-            self.connection = mavutil.mavlink_connection('udpin:0.0.0.0:14550') # Change udp port if different!
+            self.connection = mavutil.mavlink_connection('udpin:127.0.0.1:14550') # Change udp port if different!
 
             logger.info("Waiting for vehicle heartbeat...")
             self.connection.wait_heartbeat(timeout=10)

@@ -101,4 +101,4 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/workspace
 COPY . /workspace
 
-CMD ["python3", "test_cameras.py"]
+CMD ["python3", "cameras.py"]

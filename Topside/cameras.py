@@ -16,15 +16,12 @@ IMAGE_FOLDER = os.path.abspath("images")
 OUTPUT_FOLDER = os.path.abspath("output")
 CACHE_FOLDER = os.path.abspath("cache")
 
-ENABLE_LOGGING = True
+ENABLE_LOGGING = False
 FRAME_SHAPE = (1080, 1920, 3)
 FRAME_SIZE_BYTES = np.prod(FRAME_SHAPE) * np.dtype(np.uint8).itemsize
 
 CAMERA_URLS = [
-    "udp://192.168.2.1:50000?fifo_size=1000000&overrun_nonfatal=1",
-    "udp://192.168.2.1:50001?fifo_size=1000000&overrun_nonfatal=1",
-    "udp://192.168.2.1:50002?fifo_size=1000000&overrun_nonfatal=1",
-    "udp://192.168.2.1:50003?fifo_size=1000000&overrun_nonfatal=1",
+    0,0,0,0
 ]
 
 
@@ -191,10 +188,22 @@ def connect_controller(controller):
     return controller
 
 
+# COLMAP must not see the bundled OpenMVS libs, while the OpenMVS binaries must.
+clean_openmvs_env = os.environ.copy()
+if "LD_LIBRARY_PATH" in clean_openmvs_env:
+    paths = clean_openmvs_env["LD_LIBRARY_PATH"].split(":")
+    clean_paths = [p for p in paths if "openmvs_libs" not in p]
+    clean_openmvs_env["LD_LIBRARY_PATH"] = ":".join(clean_paths)
+
+openmvs_env = os.environ.copy()
+openmvs_env["LD_LIBRARY_PATH"] = f"/usr/local/lib/openmvs_libs:{openmvs_env.get('LD_LIBRARY_PATH', '')}"
+
+
 def run_photogrammetry(status_dict):
     status_dict["generating"] = True
     workspace_dir = os.path.join(OUTPUT_FOLDER, "colmap_workspace")
     mvs_dir = os.path.join(OUTPUT_FOLDER, "mvs_workspace")
+    abs_images = os.path.abspath(IMAGE_FOLDER)
 
     os.makedirs(workspace_dir, exist_ok=True)
     os.makedirs(mvs_dir, exist_ok=True)
@@ -216,8 +225,8 @@ def run_photogrammetry(status_dict):
             "--quality", "medium",
             "--use_gpu", "0",
             "--num_threads", usable_threads,
-            "--dense", "0",
-        ], check=True)
+            "--dense", "0",  # Stop before CUDA is required
+        ], check=True, env=clean_openmvs_env)
 
         sparse_dir = os.path.join(workspace_dir, "sparse")
         sparse_zero_dir = os.path.join(sparse_dir, "0")
@@ -234,23 +243,28 @@ def run_photogrammetry(status_dict):
             "--input_path", sparse_zero_dir,
             "--output_path", sparse_dir,
             "--output_type", "TXT",
-        ], check=True)
+        ], check=True, env=clean_openmvs_env)
 
-        openmvs_image_dir = os.path.join(workspace_dir, "images")
-        os.makedirs(openmvs_image_dir, exist_ok=True)
+        nested_img_dir = os.path.join(workspace_dir, "workspace", "images")
+        os.makedirs(nested_img_dir, exist_ok=True)
+
+        legacy_nested_dir = os.path.join(workspace_dir, "workspace", "output", "colmap_workspace")
+        os.makedirs(legacy_nested_dir, exist_ok=True)
+
         for img_file in os.listdir(IMAGE_FOLDER):
             src_img = os.path.join(IMAGE_FOLDER, img_file)
             if os.path.isfile(src_img):
-                shutil.copy(src_img, openmvs_image_dir)
+                shutil.copy(src_img, nested_img_dir)
+                shutil.copy(src_img, legacy_nested_dir)
 
         print("[System] Translating workspace to OpenMVS scene format...")
         subprocess.run([
             "InterfaceCOLMAP",
             "--input-file", workspace_dir,
             "--output-file", "scene.mvs",
-            "--image-folder", "images",
+            "--image-folder", abs_images,
             "--archive-type", "-1",
-        ], check=True, cwd=mvs_dir)
+        ], check=True, cwd=mvs_dir, env=openmvs_env)
 
         print("[System] Densifying Point Cloud...")
         subprocess.run([
@@ -258,7 +272,7 @@ def run_photogrammetry(status_dict):
             "--input-file", "scene.mvs",
             "--output-file", "scene_dense.mvs",
             "--archive-type", "-1",
-        ], check=True, cwd=mvs_dir)
+        ], check=True, cwd=mvs_dir, env=openmvs_env)
 
         print("[System] Reconstructing Mesh geometry...")
         subprocess.run([
@@ -266,7 +280,7 @@ def run_photogrammetry(status_dict):
             "--input-file", "scene_dense.mvs",
             "--output-file", "scene_dense_mesh.mvs",
             "--archive-type", "-1",
-        ], check=True, cwd=mvs_dir)
+        ], check=True, cwd=mvs_dir, env=openmvs_env)
 
         print("[System] Baking Textures...")
         subprocess.run([
@@ -275,7 +289,7 @@ def run_photogrammetry(status_dict):
             "--output-file", "scene_dense_mesh_texture.mvs",
             "--export-type", "obj",
             "--archive-type", "-1",
-        ], check=True, cwd=mvs_dir)
+        ], check=True, cwd=mvs_dir, env=openmvs_env)
 
         final_mesh_obj = os.path.join(mvs_dir, "scene_dense_mesh_texture.obj")
         final_mesh_mtl = os.path.join(mvs_dir, "scene_dense_mesh_texture.mtl")

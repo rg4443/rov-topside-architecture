@@ -21,7 +21,10 @@ FRAME_SHAPE = (1080, 1920, 3)
 FRAME_SIZE_BYTES = np.prod(FRAME_SHAPE) * np.dtype(np.uint8).itemsize
 
 CAMERA_URLS = [
-    0,0,0,0
+    "udp://192.168.2.1:50000?fifo_size=1000000&overrun_nonfatal=1",
+    "udp://192.168.2.1:50001?fifo_size=1000000&overrun_nonfatal=1",
+    "udp://192.168.2.1:50002?fifo_size=1000000&overrun_nonfatal=1",
+    "udp://192.168.2.1:50003?fifo_size=1000000&overrun_nonfatal=1",
 ]
 
 

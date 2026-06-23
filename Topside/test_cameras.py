@@ -15,7 +15,7 @@ IMAGE_FOLDER = os.path.abspath("images")
 OUTPUT_FOLDER = os.path.abspath("output")
 CACHE_FOLDER = os.path.abspath("cache")
 
-ENABLE_LOGGING = True
+ENABLE_LOGGING = False
 FRAME_SHAPE = (1080, 1920, 3)
 FRAME_SIZE_BYTES = np.prod(FRAME_SHAPE) * np.dtype(np.uint8).itemsize
 
@@ -378,7 +378,7 @@ if __name__ == '__main__':
             elif key == ord('p'):
                 print(f"[System] Image saved in images/img{numPictures}.jpg")
                 filename = os.path.join(IMAGE_FOLDER, f'img{numPictures}.jpg')
-                success = cv2.imwrite(filename, ai_view, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                success = cv2.imwrite(filename, local_views[0], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
                 if success:
                     print(f"[System] Image successfully saved: {filename}")
                 else:

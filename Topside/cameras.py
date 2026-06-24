@@ -439,7 +439,7 @@ if __name__ == "__main__":
                     filename = os.path.join(IMAGE_FOLDER, f"img{num_pictures}.jpg")
                     print(f"[System] Image saved in images/img{num_pictures}.jpg")
 
-                    success = cv2.imwrite(filename, local_views[0], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                    success = cv2.imwrite(filename, ai_view, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
                     if success:
                         print(f"[System] Image successfully saved: {filename}")
                     else:

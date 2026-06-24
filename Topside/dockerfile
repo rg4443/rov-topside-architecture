@@ -95,7 +95,7 @@ RUN echo "Verifying openmvs binaries..." && \
         (echo "Unmet dependencies remain." && exit 1)
 
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
-RUN pip3 install --no-cache-dir opencv-python numpy ultralytics
+RUN pip3 install --no-cache-dir opencv-python numpy ultralytics pygame
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/workspace

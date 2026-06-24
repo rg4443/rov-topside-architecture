@@ -180,13 +180,24 @@ def combine(imgs):
 
 
 def connect_controller(controller):
-    if pygame.joystick.get_count() > 0 and controller is None:
-        controller = pygame.joystick.Joystick(0)
-        controller.init()
-        print(f"[System] Controller connected: {controller.get_name()}")
-    elif pygame.joystick.get_count() == 0 and controller is not None:
-        print("[System] Controller disconnected")
+    current_count = pygame.joystick.get_count()
+    
+    if controller is not None and current_count == 0:
+        print("[System] Controller connection lost.")
         controller = None
+        
+    elif controller is None and current_count > 0:
+        print("[System] Device detected. Resetting subsystem handles...")
+        pygame.joystick.quit()
+        pygame.joystick.init()
+        
+        try:
+            controller = pygame.joystick.Joystick(0)
+            controller.init()
+            print(f"[System] Controller successfully connected: {controller.get_name()}")
+        except pygame.error as e:
+            print(f"[Warning] Handshake failed with detected device: {e}")
+            controller = None
 
     return controller
 
@@ -458,7 +469,9 @@ if __name__ == "__main__":
 
                 picture_was_pressed = picture
                 generate_was_pressed = generate
-
+    except pygame.error:
+        print("[System] Mid-frame communication dropped. Forcing disconnect state...")
+        controller = None
     except KeyboardInterrupt:
         print("\n[System] User-initiated interrupt (Ctrl+C). Shutting down...")
     except Exception as e:

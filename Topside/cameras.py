@@ -425,7 +425,7 @@ if __name__ == "__main__":
 
                 cv2.imshow("Slugbotics Topside", combined)
 
-            key = cv2.waitKey(1) & 0xFF
+            key = cv2.waitKey(16) & 0xFF
             if key in (ord("q"), ord("Q")):
                 interrupt_event.set()
 

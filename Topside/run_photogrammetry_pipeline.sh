@@ -12,7 +12,7 @@ docker run --rm -it \
   -e DISPLAY=$DISPLAY \
   -v /tmp/.X11-unix:/tmp/.X11-unix \
   -v "$(pwd):/workspace" \
-  -v /dev:/dev
+  -v /dev:/dev \
   stream-capture-pipeline
 
 xhost -local:root

@@ -8,6 +8,8 @@ TARGET_W=640
 TARGET_H=480
 TARGET_FPS=30
 
+STARTUP_STAGGER=2
+
 devnums=(0 2 4 6)
 
 
@@ -23,6 +25,7 @@ detect_fourcc() {
     local dev=$1 fmts
     fmts=$(v4l2-ctl -d "$dev" --list-formats-ext 2>/dev/null)
     if   grep -q "'MJPG'" <<<"$fmts"; then echo "MJPG"
+    elif grep -q "'H264'" <<<"$fmts"; then echo "H264"
     elif grep -q "'YUYV'" <<<"$fmts"; then echo "YUYV"
     else echo ""
     fi
@@ -52,11 +55,10 @@ pick_resolution() {
 build_args() {
     local dev=$1 fourcc res ifmt
     IN_ARGS="-hide_banner -loglevel warning -f v4l2"
-    OUT_ARGS="-f mjpeg -flush_packets 1"
 
     if ! have_v4l2ctl; then
         IN_ARGS="$IN_ARGS -input_format mjpeg"
-        OUT_ARGS="-c:v copy $OUT_ARGS"
+        OUT_ARGS="-c:v copy -f mjpeg -flush_packets 1"
         CONFIG_DESC="mjpeg/copy (unprobed: v4l2-ctl missing)"
         return
     fi
@@ -65,15 +67,16 @@ build_args() {
     res=$(pick_resolution "$dev" "$fourcc")
 
     case "$fourcc" in
-        MJPG) ifmt="mjpeg";    OUT_ARGS="-c:v copy $OUT_ARGS" ;;   
-        YUYV) ifmt="yuyv422";  OUT_ARGS="-c:v mjpeg -q:v 5 $OUT_ARGS" ;;  
-        *)    ifmt="";         OUT_ARGS="-c:v mjpeg -q:v 5 $OUT_ARGS" ;;
+        MJPG) ifmt="mjpeg";   OUT_ARGS="-c:v copy -f mjpeg -flush_packets 1" ;;          
+        H264) ifmt="h264";    OUT_ARGS="-c:v copy -f mpegts -flush_packets 1" ;;        
+        YUYV) ifmt="yuyv422"; OUT_ARGS="-c:v mjpeg -q:v 5 -f mjpeg -flush_packets 1" ;;  
+        *)    ifmt="";        OUT_ARGS="-c:v mjpeg -q:v 5 -f mjpeg -flush_packets 1" ;;
     esac
 
     [ -n "$ifmt" ] && IN_ARGS="$IN_ARGS -input_format $ifmt"
     [ -n "$res" ]  && IN_ARGS="$IN_ARGS -video_size $res"
     IN_ARGS="$IN_ARGS -framerate $TARGET_FPS"
-    CONFIG_DESC="${ifmt:-default}/${OUT_ARGS%% -f *} @ ${res:-camera-default} ${TARGET_FPS}fps"
+    CONFIG_DESC="${ifmt:-default} ${OUT_ARGS} @ ${res:-camera-default} ${TARGET_FPS}fps"
 }
 
 stream_camera() {
@@ -146,6 +149,7 @@ for i in "${!active[@]}"; do
     port=$((base_port + i))
     stream_camera "$dev" "$port" &
     pids+=($!)
+    sleep "$STARTUP_STAGGER"
 done
 
 wait

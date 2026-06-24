@@ -1,10 +1,16 @@
+import os
+
+os.environ.setdefault(
+    "OPENCV_FFMPEG_CAPTURE_OPTIONS",
+    "timeout;2000000|fifo_size;1000000|overrun_nonfatal;1",
+)
+
 import cv2
 from ultralytics import YOLO
 import multiprocessing as mp
 from multiprocessing import shared_memory
 import numpy as np
 import pygame
-import os
 import shutil
 import subprocess
 import time

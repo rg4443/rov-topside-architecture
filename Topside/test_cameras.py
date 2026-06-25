@@ -343,34 +343,25 @@ def count_images():
     return len(list_image_indices())
 
 
-def newest_image():
-    """(index, path) of the most recently written imgN.jpg, or (None, None)."""
-    candidates = []
-    try:
-        for name in os.listdir(IMAGE_FOLDER):
-            m = re.fullmatch(r"img(\d+)\.jpg", name)
-            if m:
-                path = os.path.join(IMAGE_FOLDER, name)
-                candidates.append((os.path.getmtime(path), int(m.group(1)), path))
-    except FileNotFoundError:
-        pass
-    if not candidates:
-        return None, None
-    candidates.sort()  # by mtime, then index
-    _, index, path = candidates[-1]
-    return index, path
+def next_image_index():
+    """Index for the next capture: one past the current highest, or 0 if empty.
+    Captures always append to the end of the list and never overwrite."""
+    indices = list_image_indices()
+    return (indices[-1] + 1) if indices else 0
 
 
 def overlay_pip(base, thumb, label):
     bh, bw = base.shape[:2]
     th, tw = thumb.shape[:2]
-    x2, y2 = bw - PIP_MARGIN, bh - PIP_MARGIN
-    x1, y1 = x2 - tw, y2 - th
-    if x1 < 0 or y1 < 0:
+    x2 = bw - PIP_MARGIN
+    x1 = x2 - tw
+    y1 = PIP_MARGIN
+    y2 = y1 + th
+    if x1 < 0 or y2 > bh:
         return base
     base[y1:y2, x1:x2] = thumb
     cv2.rectangle(base, (x1 - 2, y1 - 2), (x2 + 1, y2 + 1), (0, 255, 0), 2)
-    cv2.putText(base, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    cv2.putText(base, label, (x1, y2 + 24), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
     return base
 
 
@@ -431,7 +422,6 @@ if __name__ == '__main__':
     print("[System] All Vision Processes Active.")
 
     WINDOW = 'Slugbotics Topside'
-    numPictures = 0
     pg_thread = None
 
     preview_thumb = None
@@ -464,37 +454,42 @@ if __name__ == '__main__':
 
             elif key == ord('p'):
                 snapshot = local_views[0].copy()
-                filename = os.path.join(IMAGE_FOLDER, f'img{numPictures}.jpg')
+                idx = next_image_index()
+                filename = os.path.join(IMAGE_FOLDER, f'img{idx}.jpg')
                 success = cv2.imwrite(filename, snapshot, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
                 if success:
                     total = count_images()
-                    print(f"[System] Image saved: images/img{numPictures}.jpg  ({total} image(s) in folder)")
+                    print(f"[System] Image saved: images/img{idx}.jpg  ({total} image(s) in folder)")
                     preview_thumb = cv2.resize(snapshot, (PIP_W, PIP_H))
-                    preview_label = f"img{numPictures}.jpg  [{total}]"
+                    preview_label = f"img{idx}.jpg  [{total}]"
                     preview_until = time.time() + PREVIEW_DURATION
-                    numPictures += 1
                 else:
                     print(f"[ERROR] Failed to save image to: {filename}. Check folder permissions.")
 
             elif key == ord('d'):
-                idx, target = newest_image()
-                if target is None:
+                indices = list_image_indices()
+                if not indices:
                     print("[System] No images to delete.")
                 else:
+                    idx = indices[-1]
+                    target = os.path.join(IMAGE_FOLDER, f'img{idx}.jpg')
                     try:
                         os.remove(target)
                     except OSError as e:
                         print(f"[ERROR] Could not delete img{idx}.jpg: {e}")
                     else:
-                        remaining = count_images()
-                        print(f"[System] Deleted img{idx}.jpg  --  {remaining} image(s) remaining in images/")
+                        remaining = list_image_indices()
+                        print(f"[System] Deleted img{idx}.jpg  --  {len(remaining)} image(s) remaining in images/")
 
-                        nidx, npath = newest_image()
-                        shown = cv2.imread(npath) if npath is not None else None
-                        if shown is not None:
-                            preview_thumb = cv2.resize(shown, (PIP_W, PIP_H))
-                            preview_label = f"deleted img{idx} | newest img{nidx} [{remaining}]"
-                            preview_until = time.time() + PREVIEW_DURATION
+                        if remaining:
+                            nidx = remaining[-1]
+                            shown = cv2.imread(os.path.join(IMAGE_FOLDER, f'img{nidx}.jpg'))
+                            if shown is not None:
+                                preview_thumb = cv2.resize(shown, (PIP_W, PIP_H))
+                                preview_label = f"deleted img{idx} | newest img{nidx} [{len(remaining)}]"
+                                preview_until = time.time() + PREVIEW_DURATION
+                            else:
+                                preview_thumb = None
                         else:
                             preview_thumb = None  # folder empty; terminal log covers it
 

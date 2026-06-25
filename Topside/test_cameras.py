@@ -320,8 +320,10 @@ def combine(imgs):
     return cv2.vconcat([img1, img5])
 
 
-PREVIEW_W, PREVIEW_H = 1920, 1440
-PREVIEW_DURATION = 1.2
+PREVIEW_DURATION = 1.2  
+
+PIP_W, PIP_H = 480, 270
+PIP_MARGIN = 20
 
 
 def list_image_indices():
@@ -359,20 +361,17 @@ def newest_image():
     return index, path
 
 
-def build_preview(frame, label):
-    """Compose a window-sized review card from an already-in-memory frame.
-    One resize + one labelled bar; built only when a key is pressed."""
-    top = cv2.resize(frame, (PREVIEW_W, 1080))
-    bar = np.zeros((PREVIEW_H - 1080, PREVIEW_W, 3), dtype=np.uint8)
-    cv2.putText(bar, label, (20, 210), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 255, 0), 3)
-    return cv2.vconcat([top, bar])
-
-
-def build_blank(label):
-    """A plain card for when there is no image to show (e.g. folder emptied)."""
-    canvas = np.zeros((PREVIEW_H, PREVIEW_W, 3), dtype=np.uint8)
-    cv2.putText(canvas, label, (20, PREVIEW_H // 2), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 0, 255), 3)
-    return canvas
+def overlay_pip(base, thumb, label):
+    bh, bw = base.shape[:2]
+    th, tw = thumb.shape[:2]
+    x2, y2 = bw - PIP_MARGIN, bh - PIP_MARGIN
+    x1, y1 = x2 - tw, y2 - th
+    if x1 < 0 or y1 < 0:
+        return base
+    base[y1:y2, x1:x2] = thumb
+    cv2.rectangle(base, (x1 - 2, y1 - 2), (x2 + 1, y2 + 1), (0, 255, 0), 2)
+    cv2.putText(base, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    return base
 
 
 if __name__ == '__main__':
@@ -430,31 +429,33 @@ if __name__ == '__main__':
         log_proc.start()
 
     print("[System] All Vision Processes Active.")
-    print("[System] Commencing Automated Headless Test...")
 
     WINDOW = 'Slugbotics Topside'
     numPictures = 0
     pg_thread = None
 
-    preview_frame = None
+    preview_thumb = None
+    preview_label = ""
     preview_until = 0.0
 
     try:
         while not interrupt_event.is_set():
             now = time.time()
 
-            if preview_frame is not None and now < preview_until:
-                cv2.imshow(WINDOW, preview_frame)
-            else:
-                preview_frame = None
-                imgs = [ai_view, local_views[1], local_views[2], local_views[3]]
-                combined = combine(imgs)
+            imgs = [ai_view, local_views[1], local_views[2], local_views[3]]
+            combined = combine(imgs)
 
-                if ENABLE_LOGGING:
-                    lat0 = now - sync_dict.get("lat_0", now)
-                    cv2.putText(combined, f"Latency: {lat0:.3f}s", (7, 130), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            if ENABLE_LOGGING:
+                lat0 = now - sync_dict.get("lat_0", now)
+                cv2.putText(combined, f"Latency: {lat0:.3f}s", (7, 130), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-                cv2.imshow(WINDOW, combined)
+            if preview_thumb is not None:
+                if now < preview_until:
+                    overlay_pip(combined, preview_thumb, preview_label)
+                else:
+                    preview_thumb = None
+
+            cv2.imshow(WINDOW, combined)
 
             key = cv2.waitKey(16) & 0xFF
 
@@ -468,7 +469,8 @@ if __name__ == '__main__':
                 if success:
                     total = count_images()
                     print(f"[System] Image saved: images/img{numPictures}.jpg  ({total} image(s) in folder)")
-                    preview_frame = build_preview(snapshot, f"CAPTURED  img{numPictures}.jpg   [{total} total]")
+                    preview_thumb = cv2.resize(snapshot, (PIP_W, PIP_H))
+                    preview_label = f"img{numPictures}.jpg  [{total}]"
                     preview_until = time.time() + PREVIEW_DURATION
                     numPictures += 1
                 else:
@@ -488,13 +490,13 @@ if __name__ == '__main__':
                         print(f"[System] Deleted img{idx}.jpg  --  {remaining} image(s) remaining in images/")
 
                         nidx, npath = newest_image()
-                        if npath is not None:
-                            shown = cv2.imread(npath)
-                            label = f"DELETED img{idx}.jpg   newest now img{nidx}.jpg   [{remaining} left]"
-                            preview_frame = build_preview(shown, label) if shown is not None else build_blank(label)
+                        shown = cv2.imread(npath) if npath is not None else None
+                        if shown is not None:
+                            preview_thumb = cv2.resize(shown, (PIP_W, PIP_H))
+                            preview_label = f"deleted img{idx} | newest img{nidx} [{remaining}]"
+                            preview_until = time.time() + PREVIEW_DURATION
                         else:
-                            preview_frame = build_blank(f"DELETED img{idx}.jpg   [0 images left]")
-                        preview_until = time.time() + PREVIEW_DURATION
+                            preview_thumb = None  # folder empty; terminal log covers it
 
             elif key == ord('g'):
                 if status_dict["generating"]:
@@ -504,22 +506,6 @@ if __name__ == '__main__':
                     pg_thread = threading.Thread(target=run_photogrammetry, args=(status_dict,))
                     pg_thread.daemon = True
                     pg_thread.start()
-
-        if not status_dict["generating"]:
-            pg_thread = threading.Thread(target=run_photogrammetry, args=(status_dict,))
-            pg_thread.daemon = True
-            pg_thread.start()
-
-        time.sleep(0.5)
-
-        while status_dict["generating"]:
-            time.sleep(2)
-
-        if status_dict.get("failed", False):
-            raise RuntimeError("Photogrammetry stage failed")
-
-        print("\n[System] Photogrammetry test complete! Check your local output/ folder.")
-        interrupt_event.set()
 
     except KeyboardInterrupt:
         print("\n[System] User-initiated interrupt (Ctrl+C). Shutting down...")

@@ -1,9 +1,16 @@
+import os
+
+os.environ.setdefault(
+    "OPENCV_FFMPEG_CAPTURE_OPTIONS",
+    "timeout;2000000|fifo_size;1000000|overrun_nonfatal;1",
+)
+
 import cv2
 from ultralytics import YOLO
 import multiprocessing as mp
 from multiprocessing import shared_memory
 import numpy as np
-import os
+import re
 import shutil
 import subprocess
 import time
@@ -21,61 +28,70 @@ FRAME_SIZE_BYTES = np.prod(FRAME_SHAPE) * np.dtype(np.uint8).itemsize
 
 def init_folders():
     os.makedirs(CACHE_FOLDER, exist_ok=True)
-    
+
     if os.path.exists(OUTPUT_FOLDER):
         try:
             shutil.rmtree(OUTPUT_FOLDER)
         except Exception as e:
             print(f"Failed to remove {OUTPUT_FOLDER}: {e}")
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    
+
     os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
 
 def camera_worker(camera_id, url, shm_name, sync_dict, interrupt_event):
     """
-    Isolated process capturing video frames and pushing them directly
-    into Shared Memory via a non-allocating memory copy.
+    Isolated process capturing video frames and pushing them directly into shared memory.
     """
     print(f"[Executive] Initializing Stream {camera_id}...")
-    
+
     existing_shm = shared_memory.SharedMemory(name=shm_name)
     shared_array = np.ndarray(FRAME_SHAPE, dtype=np.uint8, buffer=existing_shm.buf)
-    
-    video = cv2.VideoCapture(url)
-    video.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    
-    last_heartbeat = time.time()
-    timeout_threshold = 2.0
-    first_frame_received = False
-    recovery_start = time.time()
+
+    retry_count = 0
 
     try:
         while not interrupt_event.is_set():
-            start_time = time.time()
-            r, f = video.read()
-            
-            if r and f is not None:
-                if not first_frame_received and ENABLE_LOGGING:
-                    duration = time.time() - recovery_start
-                    with open("recovery_performance.csv", mode='a', newline='') as rf:
-                        csv.writer(rf).writerow([time.strftime("%H:%M:%S"), camera_id, f"{duration:.3f}"])
-                    first_frame_received = True
+            wait_time = min(retry_count * 2, 10)
+            if retry_count > 0:
+                print(f"[Executive] Retry {retry_count} for Stream {camera_id} in {wait_time}s...")
+                time.sleep(wait_time)
 
-                np.copyto(shared_array, f)
-                
-                sync_dict[f"lat_{camera_id}"] = start_time
-                sync_dict[f"frame_tick_{camera_id}"] = sync_dict.get(f"frame_tick_{camera_id}", 0) + 1
-                
-                last_heartbeat = time.time()
-            
-            if (time.time() - last_heartbeat) > timeout_threshold:
-                print(f"[Watchdog] Stream {camera_id} HEARTBEAT LOST.")
-                time.sleep(1.0)
-                last_heartbeat = time.time()
-                
+            recovery_start = time.time()
+            video = cv2.VideoCapture(url)
+            video.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+            last_heartbeat = time.time()
+            timeout_threshold = 2.0
+            first_frame_received = False
+
+            while not interrupt_event.is_set():
+                start_time = time.time()
+                r, f = video.read()
+
+                if r and f is not None:
+                    if f.shape != FRAME_SHAPE:
+                        f = cv2.resize(f, (FRAME_SHAPE[1], FRAME_SHAPE[0]))
+
+                    if not first_frame_received and ENABLE_LOGGING:
+                        duration = time.time() - recovery_start
+                        with open("recovery_performance.csv", mode="a", newline="") as rf:
+                            csv.writer(rf).writerow([time.strftime("%H:%M:%S"), camera_id, f"{duration:.3f}"])
+                        first_frame_received = True
+
+                    np.copyto(shared_array, f)
+                    sync_dict[f"lat_{camera_id}"] = start_time
+                    sync_dict[f"frame_tick_{camera_id}"] = sync_dict.get(f"frame_tick_{camera_id}", 0) + 1
+                    last_heartbeat = time.time()
+
+                if (time.time() - last_heartbeat) > timeout_threshold:
+                    print(f"[Watchdog] Stream {camera_id} HEARTBEAT LOST. Auto-Recovering...")
+                    break
+
+            video.release()
+            retry_count += 1
+
     finally:
-        video.release()
         existing_shm.close()
 
 
@@ -85,36 +101,36 @@ def inference_worker(raw_shm_name, out_shm_name, sync_dict, interrupt_event):
     to completely avoid Python GIL locking conditions.
     """
     model = YOLO("best.pt")
-    
+
     raw_shm = shared_memory.SharedMemory(name=raw_shm_name)
     raw_array = np.ndarray(FRAME_SHAPE, dtype=np.uint8, buffer=raw_shm.buf)
-    
+
     out_shm = shared_memory.SharedMemory(name=out_shm_name)
     out_array = np.ndarray(FRAME_SHAPE, dtype=np.uint8, buffer=out_shm.buf)
-    
+
     last_tick = -1
-    
+
     try:
         while not interrupt_event.is_set():
             current_tick = sync_dict.get("frame_tick_0", 0)
-            
+
             if current_tick != last_tick:
                 last_tick = current_tick
-                
+
                 inf_start = time.time()
                 results = model.predict(raw_array, verbose=False)
                 inf_duration = time.time() - inf_start
-                
+
                 annotated = results[0].plot()
                 number = len(results[0].boxes)
                 cv2.putText(annotated, f"Green Crabs: {number}", (7, 70),
                             cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
-                
+
                 np.copyto(out_array, annotated)
                 sync_dict["inference_time"] = inf_duration
             else:
                 time.sleep(0.002)
-                
+
     finally:
         raw_shm.close()
         out_shm.close()
@@ -122,7 +138,7 @@ def inference_worker(raw_shm_name, out_shm_name, sync_dict, interrupt_event):
 
 def telemetry_logger(sync_dict, interrupt_event, filename="vision_performance.csv"):
     if not ENABLE_LOGGING: return
-    
+
     with open(filename, mode='w', newline='') as f:
         csv.writer(f).writerow(["Timestamp", "Total_AI_Stream_Lat", "Pure_AI_Inference", "Raw_1", "Raw_2", "Raw_3", "FPS"])
 
@@ -130,17 +146,17 @@ def telemetry_logger(sync_dict, interrupt_event, filename="vision_performance.cs
         time.sleep(10)
         timestamp = time.strftime("%H:%M:%S")
         now = time.time()
-        
+
         pure_inf = sync_dict.get("inference_time", 0.0)
         fps = 1.0 / pure_inf if pure_inf > 0 else 0.0
-        
+
         total_lat_0 = now - sync_dict.get("lat_0", now)
         total_lat_1 = now - sync_dict.get("lat_1", now)
         total_lat_2 = now - sync_dict.get("lat_2", now)
         total_lat_3 = now - sync_dict.get("lat_3", now)
-        
+
         row = [timestamp, total_lat_0, pure_inf, total_lat_1, total_lat_2, total_lat_3, f"{fps:.2f}"]
-        
+
         with open(filename, mode='a', newline='') as f:
             csv.writer(f).writerow(row)
 
@@ -158,11 +174,11 @@ def run_photogrammetry(status_dict):
     status_dict["generating"] = True
     workspace_dir = os.path.join(OUTPUT_FOLDER, "colmap_workspace")
     mvs_dir = os.path.join(OUTPUT_FOLDER, "mvs_workspace")
-    abs_images = os.path.abspath(IMAGE_FOLDER)    
-    
+    abs_images = os.path.abspath(IMAGE_FOLDER)
+
     os.makedirs(workspace_dir, exist_ok=True)
     os.makedirs(mvs_dir, exist_ok=True)
-    
+
     total_cores = mp.cpu_count()
     usable_threads = str(max(1, total_cores - 3))
 
@@ -180,27 +196,29 @@ def run_photogrammetry(status_dict):
             "--quality", "medium",
             "--use_gpu", "0",
             "--num_threads", usable_threads,
-            "--dense", "0"  # Stop before CUDA is required
+            "--dense", "0",  # Stop before CUDA is required
         ], check=True, env=clean_openmvs_env)
 
-        sparse_zero_dir = os.path.join(workspace_dir, "sparse", "0")
+        sparse_dir = os.path.join(workspace_dir, "sparse")
+        sparse_zero_dir = os.path.join(sparse_dir, "0")
         os.makedirs(sparse_zero_dir, exist_ok=True)
-        
-        for item in os.listdir(os.path.join(workspace_dir, "sparse")):
-            if item.endswith(".bin") and item != "0":
-                shutil.move(os.path.join(workspace_dir, "sparse", item), os.path.join(sparse_zero_dir, item))
 
-                print("[System] Converting COLMAP model binaries to TXT format...")
+        for item in os.listdir(sparse_dir):
+            src = os.path.join(sparse_dir, item)
+            if item.endswith(".bin") and os.path.isfile(src):
+                shutil.move(src, os.path.join(sparse_zero_dir, item))
+
+        print("[System] Converting COLMAP model binaries to TXT format...")
         subprocess.run([
             "colmap", "model_converter",
             "--input_path", sparse_zero_dir,
-            "--output_path", os.path.join(workspace_dir, "sparse"),
-            "--output_type", "TXT"
+            "--output_path", sparse_dir,
+            "--output_type", "TXT",
         ], check=True, env=clean_openmvs_env)
 
         nested_img_dir = os.path.join(workspace_dir, "workspace", "images")
         os.makedirs(nested_img_dir, exist_ok=True)
-        
+
         legacy_nested_dir = os.path.join(workspace_dir, "workspace", "output", "colmap_workspace")
         os.makedirs(legacy_nested_dir, exist_ok=True)
 
@@ -216,7 +234,7 @@ def run_photogrammetry(status_dict):
             "--input-file", workspace_dir,
             "--output-file", "scene.mvs",
             "--image-folder", abs_images,
-            "--archive-type", "-1"
+            "--archive-type", "-1",
         ], check=True, cwd=mvs_dir, env=openmvs_env)
 
         print("[System] Densifying Point Cloud...")
@@ -224,7 +242,7 @@ def run_photogrammetry(status_dict):
             "DensifyPointCloud",
             "--input-file", "scene.mvs",
             "--output-file", "scene_dense.mvs",
-            "--archive-type", "-1"
+            "--archive-type", "-1",
         ], check=True, cwd=mvs_dir, env=openmvs_env)
 
         print("[System] Reconstructing Mesh geometry...")
@@ -232,7 +250,7 @@ def run_photogrammetry(status_dict):
             "ReconstructMesh",
             "--input-file", "scene_dense.mvs",
             "--output-file", "scene_dense_mesh.mvs",
-            "--archive-type", "-1"
+            "--archive-type", "-1",
         ], check=True, cwd=mvs_dir, env=openmvs_env)
 
         print("[System] Baking Textures...")
@@ -241,38 +259,41 @@ def run_photogrammetry(status_dict):
             "--input-file", "scene_dense_mesh.mvs",
             "--output-file", "scene_dense_mesh_texture.mvs",
             "--export-type", "obj",
-            "--archive-type", "-1"
+            "--archive-type", "-1",
         ], check=True, cwd=mvs_dir, env=openmvs_env)
-        
+
         final_mesh_obj = os.path.join(mvs_dir, "scene_dense_mesh_texture.obj")
         final_mesh_mtl = os.path.join(mvs_dir, "scene_dense_mesh_texture.mtl")
-        
+
         if os.path.exists(final_mesh_obj):
             shutil.copy(final_mesh_obj, os.path.join(OUTPUT_FOLDER, "final_model.obj"))
-            shutil.copy(final_mesh_mtl, os.path.join(OUTPUT_FOLDER, "final_model.mtl"))
-            
+
+            if os.path.exists(final_mesh_mtl):
+                shutil.copy(final_mesh_mtl, os.path.join(OUTPUT_FOLDER, "final_model.mtl"))
+
             for file in os.listdir(mvs_dir):
                 if file.startswith("scene_dense_mesh_texture_material_0_map_Kd"):
-                    ext = file.split('.')[-1]
+                    ext = file.split(".")[-1]
                     shutil.copy(
                         os.path.join(mvs_dir, file),
-                        os.path.join(OUTPUT_FOLDER, f"final_model_material_0_map_Kd.{ext}")
+                        os.path.join(OUTPUT_FOLDER, f"final_model_material_0_map_Kd.{ext}"),
                     )
                     break
-            
+
             obj_path = os.path.join(OUTPUT_FOLDER, "final_model.obj")
-            with open(obj_path, 'r') as f:
+            with open(obj_path, "r") as f:
                 obj_content = f.read()
             obj_content = obj_content.replace("scene_dense_mesh_texture.mtl", "final_model.mtl")
-            with open(obj_path, 'w') as f:
+            with open(obj_path, "w") as f:
                 f.write(obj_content)
 
             mtl_path = os.path.join(OUTPUT_FOLDER, "final_model.mtl")
-            with open(mtl_path, 'r') as f:
-                mtl_content = f.read()
-            mtl_content = mtl_content.replace("scene_dense_mesh_texture_material_0_map_Kd", "final_model_material_0_map_Kd")
-            with open(mtl_path, 'w') as f:
-                f.write(mtl_content)
+            if os.path.exists(mtl_path):
+                with open(mtl_path, "r") as f:
+                    mtl_content = f.read()
+                mtl_content = mtl_content.replace("scene_dense_mesh_texture_material_0_map_Kd", "final_model_material_0_map_Kd")
+                with open(mtl_path, "w") as f:
+                    f.write(mtl_content)
 
             print("\n[System] PHOTOGRAMMETRY COMPLETE: final_model.obj is ready in output/ folder!")
         else:
@@ -281,13 +302,14 @@ def run_photogrammetry(status_dict):
 
     except subprocess.CalledProcessError as e:
         status_dict["failed"] = True
-        print(f"\n[CRITICAL ERROR] Pipeline failed during binary execution.")
+        print("\n[CRITICAL ERROR] Pipeline failed during binary execution.")
         print(f"Command that crashed: {' '.join(e.cmd)}")
     except FileNotFoundError as e:
         status_dict["failed"] = True
         print(f"\n[ERROR] Missing binary dependency: {e}")
     finally:
         status_dict["generating"] = False
+
 
 def combine(imgs):
     img1 = cv2.resize(imgs[0], (1920, 1080))
@@ -297,10 +319,66 @@ def combine(imgs):
     img5 = cv2.hconcat([img2, img3, img4])
     return cv2.vconcat([img1, img5])
 
+
+PREVIEW_W, PREVIEW_H = 1920, 1440
+PREVIEW_DURATION = 1.2
+
+
+def list_image_indices():
+    """Indices N of files named imgN.jpg currently in IMAGE_FOLDER, ascending."""
+    indices = []
+    try:
+        for name in os.listdir(IMAGE_FOLDER):
+            m = re.fullmatch(r"img(\d+)\.jpg", name)
+            if m:
+                indices.append(int(m.group(1)))
+    except FileNotFoundError:
+        pass
+    return sorted(indices)
+
+
+def count_images():
+    return len(list_image_indices())
+
+
+def newest_image():
+    """(index, path) of the most recently written imgN.jpg, or (None, None)."""
+    candidates = []
+    try:
+        for name in os.listdir(IMAGE_FOLDER):
+            m = re.fullmatch(r"img(\d+)\.jpg", name)
+            if m:
+                path = os.path.join(IMAGE_FOLDER, name)
+                candidates.append((os.path.getmtime(path), int(m.group(1)), path))
+    except FileNotFoundError:
+        pass
+    if not candidates:
+        return None, None
+    candidates.sort()  # by mtime, then index
+    _, index, path = candidates[-1]
+    return index, path
+
+
+def build_preview(frame, label):
+    """Compose a window-sized review card from an already-in-memory frame.
+    One resize + one labelled bar; built only when a key is pressed."""
+    top = cv2.resize(frame, (PREVIEW_W, 1080))
+    bar = np.zeros((PREVIEW_H - 1080, PREVIEW_W, 3), dtype=np.uint8)
+    cv2.putText(bar, label, (20, 210), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 255, 0), 3)
+    return cv2.vconcat([top, bar])
+
+
+def build_blank(label):
+    """A plain card for when there is no image to show (e.g. folder emptied)."""
+    canvas = np.zeros((PREVIEW_H, PREVIEW_W, 3), dtype=np.uint8)
+    cv2.putText(canvas, label, (20, PREVIEW_H // 2), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 0, 255), 3)
+    return canvas
+
+
 if __name__ == '__main__':
     mp.set_start_method('spawn', force=True)
     init_folders()
-    
+
     if ENABLE_LOGGING:
         with open("recovery_performance.csv", mode='w', newline='') as f:
             csv.writer(f).writerow(["Timestamp", "Camera_ID", "Recovery_Duration_Sec"])
@@ -309,7 +387,7 @@ if __name__ == '__main__':
     manager = mp.Manager()
     sync_dict = manager.dict()
     status_dict = manager.dict({"generating": False, "pg_pid": None, "failed": False})
-    
+
     for i in range(4):
         sync_dict[f"lat_{i}"] = time.time()
         sync_dict[f"frame_tick_{i}"] = 0
@@ -354,37 +432,70 @@ if __name__ == '__main__':
     print("[System] All Vision Processes Active.")
     print("[System] Commencing Automated Headless Test...")
 
+    WINDOW = 'Slugbotics Topside'
     numPictures = 0
     pg_thread = None
 
+    preview_frame = None
+    preview_until = 0.0
+
     try:
         while not interrupt_event.is_set():
-            imgs = [ai_view] + [local_views[1], local_views[2], local_views[3]]
-            
-            combined = combine(imgs)
-            
-            if ENABLE_LOGGING:
-                now = time.time()
-                lat0 = now - sync_dict.get("lat_0", now)
-                cv2.putText(combined, f"Latency: {lat0:.3f}s", (7, 130), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            
-            cv2.imshow('Slugbotics Topside', combined)
-            
+            now = time.time()
+
+            if preview_frame is not None and now < preview_until:
+                cv2.imshow(WINDOW, preview_frame)
+            else:
+                preview_frame = None
+                imgs = [ai_view, local_views[1], local_views[2], local_views[3]]
+                combined = combine(imgs)
+
+                if ENABLE_LOGGING:
+                    lat0 = now - sync_dict.get("lat_0", now)
+                    cv2.putText(combined, f"Latency: {lat0:.3f}s", (7, 130), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+                cv2.imshow(WINDOW, combined)
+
             key = cv2.waitKey(16) & 0xFF
-            
+
             if key == ord('q'):
                 interrupt_event.set()
-                
+
             elif key == ord('p'):
-                print(f"[System] Image saved in images/img{numPictures}.jpg")
+                snapshot = local_views[0].copy()
                 filename = os.path.join(IMAGE_FOLDER, f'img{numPictures}.jpg')
-                success = cv2.imwrite(filename, local_views[0], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                success = cv2.imwrite(filename, snapshot, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
                 if success:
-                    print(f"[System] Image successfully saved: {filename}")
+                    total = count_images()
+                    print(f"[System] Image saved: images/img{numPictures}.jpg  ({total} image(s) in folder)")
+                    preview_frame = build_preview(snapshot, f"CAPTURED  img{numPictures}.jpg   [{total} total]")
+                    preview_until = time.time() + PREVIEW_DURATION
+                    numPictures += 1
                 else:
                     print(f"[ERROR] Failed to save image to: {filename}. Check folder permissions.")
-                numPictures += 1
-                
+
+            elif key == ord('d'):
+                idx, target = newest_image()
+                if target is None:
+                    print("[System] No images to delete.")
+                else:
+                    try:
+                        os.remove(target)
+                    except OSError as e:
+                        print(f"[ERROR] Could not delete img{idx}.jpg: {e}")
+                    else:
+                        remaining = count_images()
+                        print(f"[System] Deleted img{idx}.jpg  --  {remaining} image(s) remaining in images/")
+
+                        nidx, npath = newest_image()
+                        if npath is not None:
+                            shown = cv2.imread(npath)
+                            label = f"DELETED img{idx}.jpg   newest now img{nidx}.jpg   [{remaining} left]"
+                            preview_frame = build_preview(shown, label) if shown is not None else build_blank(label)
+                        else:
+                            preview_frame = build_blank(f"DELETED img{idx}.jpg   [0 images left]")
+                        preview_until = time.time() + PREVIEW_DURATION
+
             elif key == ord('g'):
                 if status_dict["generating"]:
                     print('[System] Photogrammetry is already running')
@@ -402,7 +513,7 @@ if __name__ == '__main__':
         time.sleep(0.5)
 
         while status_dict["generating"]:
-            time.sleep(2) 
+            time.sleep(2)
 
         if status_dict.get("failed", False):
             raise RuntimeError("Photogrammetry stage failed")
@@ -418,21 +529,14 @@ if __name__ == '__main__':
     finally:
         print("[System] Shutdown signaled. Terminating processes...")
         interrupt_event.set()
-        
+
         for p in processes:
             if p.is_alive():
                 p.terminate()
-                p.join(timeout=1.0)
+            p.join(timeout=1.0)
 
-        if status_dict["generating"] and status_dict["pg_pid"]:
-            print("[System] Terminating running photogrammetry binary context...")
-            try:
-                os.kill(status_dict["pg_pid"], 9)
-            except ProcessLookupError:
-                pass
-        
-        if pg_thread:
-            pg_thread.join(timeout=1.0)
+        if pg_thread is not None and pg_thread.is_alive():
+            pg_thread.join(timeout=2.0)
 
         print("[System] Releasing Shared Memory hooks...")
         for shm in shm_buffers:

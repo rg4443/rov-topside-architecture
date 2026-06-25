@@ -26,6 +26,12 @@ ENABLE_LOGGING = False
 FRAME_SHAPE = (1080, 1920, 3)
 FRAME_SIZE_BYTES = np.prod(FRAME_SHAPE) * np.dtype(np.uint8).itemsize
 
+CAMERA_URLS = [
+    0,  
+    0, 
+    0,  
+]
+
 def init_folders():
     os.makedirs(CACHE_FOLDER, exist_ok=True)
 
@@ -312,12 +318,14 @@ def run_photogrammetry(status_dict):
 
 
 def combine(imgs):
-    img1 = cv2.resize(imgs[0], (1920, 1080))
-    img2 = cv2.resize(imgs[1], (640, 360))
-    img3 = cv2.resize(imgs[2], (640, 360))
-    img4 = cv2.resize(imgs[3], (640, 360))
-    img5 = cv2.hconcat([img2, img3, img4])
-    return cv2.vconcat([img1, img5])
+    # Main (AI) feed on top, the two helper feeds split the full width below it.
+    # Two 960-wide tiles == 1920, so the bottom row matches the top and leaves no
+    # empty/black tile on the HUD.
+    main = cv2.resize(imgs[0], (1920, 1080))
+    helper1 = cv2.resize(imgs[1], (960, 540))
+    helper2 = cv2.resize(imgs[2], (960, 540))
+    bottom = cv2.hconcat([helper1, helper2])
+    return cv2.vconcat([main, bottom])
 
 
 PREVIEW_DURATION = 1.2  
@@ -378,14 +386,14 @@ if __name__ == '__main__':
     sync_dict = manager.dict()
     status_dict = manager.dict({"generating": False, "pg_pid": None, "failed": False})
 
-    for i in range(4):
+    for i in range(len(CAMERA_URLS)):
         sync_dict[f"lat_{i}"] = time.time()
         sync_dict[f"frame_tick_{i}"] = 0
     sync_dict["inference_time"] = 0.0
 
     shm_buffers = []
     cam_shm_names = []
-    for i in range(4):
+    for i in range(len(CAMERA_URLS)):
         shm = shared_memory.SharedMemory(create=True, size=FRAME_SIZE_BYTES)
         shm_buffers.append(shm)
         cam_shm_names.append(shm.name)
@@ -397,10 +405,10 @@ if __name__ == '__main__':
     ai_arr = np.ndarray(FRAME_SHAPE, dtype=np.uint8, buffer=ai_out_shm.buf)
     ai_arr[:] = 0
 
-    local_views = [np.ndarray(FRAME_SHAPE, dtype=np.uint8, buffer=shm.buf) for shm in shm_buffers[:4]]
+    local_views = [np.ndarray(FRAME_SHAPE, dtype=np.uint8, buffer=shm.buf) for shm in shm_buffers[:len(CAMERA_URLS)]]
     ai_view = np.ndarray(FRAME_SHAPE, dtype=np.uint8, buffer=ai_out_shm.buf)
 
-    urls = [0, 0, 0, 0]
+    urls = CAMERA_URLS
     processes = []
     for i in range(len(urls)):
         p = mp.Process(target=camera_worker, args=(i, urls[i], cam_shm_names[i], sync_dict, interrupt_event))
@@ -432,7 +440,7 @@ if __name__ == '__main__':
         while not interrupt_event.is_set():
             now = time.time()
 
-            imgs = [ai_view, local_views[1], local_views[2], local_views[3]]
+            imgs = [ai_view, local_views[1], local_views[2]]
             combined = combine(imgs)
 
             if ENABLE_LOGGING:

@@ -31,7 +31,6 @@ CAMERA_URLS = [
     "udp://192.168.2.1:50000?fifo_size=1000000&overrun_nonfatal=1",
     "udp://192.168.2.1:50001?fifo_size=1000000&overrun_nonfatal=1",
     "udp://192.168.2.1:50002?fifo_size=1000000&overrun_nonfatal=1",
-    "udp://192.168.2.1:50003?fifo_size=1000000&overrun_nonfatal=1",
 ]
 
 
@@ -178,12 +177,11 @@ def telemetry_logger(sync_dict, interrupt_event, filename="vision_performance.cs
 
 
 def combine(imgs):
-    img1 = cv2.resize(imgs[0], (1920, 1080))
-    img2 = cv2.resize(imgs[1], (640, 360))
-    img3 = cv2.resize(imgs[2], (640, 360))
-    img4 = cv2.resize(imgs[3], (640, 360))
-    img5 = cv2.hconcat([img2, img3, img4])
-    return cv2.vconcat([img1, img5])
+    main = cv2.resize(imgs[0], (1920, 1080))
+    helper1 = cv2.resize(imgs[1], (960, 540))
+    helper2 = cv2.resize(imgs[2], (960, 540))
+    bottom = cv2.hconcat([helper1, helper2])
+    return cv2.vconcat([main, bottom])
 
 
 PREVIEW_DURATION = 1.2
@@ -483,9 +481,9 @@ if __name__ == "__main__":
 
         while not interrupt_event.is_set():
             now = time.time()
-            imgs = [ai_view] + local_views[1:4]
+            imgs = [ai_view, local_views[1], local_views[2]]
 
-            if len(imgs) == 4:
+            if len(imgs) == 3:
                 combined = combine(imgs)
 
                 if ENABLE_LOGGING:

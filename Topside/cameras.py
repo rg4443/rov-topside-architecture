@@ -11,6 +11,7 @@ import multiprocessing as mp
 from multiprocessing import shared_memory
 import numpy as np
 import pygame
+import re
 import shutil
 import subprocess
 import time
@@ -183,6 +184,53 @@ def combine(imgs):
     img4 = cv2.resize(imgs[3], (640, 360))
     img5 = cv2.hconcat([img2, img3, img4])
     return cv2.vconcat([img1, img5])
+
+
+PREVIEW_DURATION = 1.2
+PIP_W, PIP_H = 480, 270
+PIP_MARGIN = 20
+
+
+def list_image_indices():
+    """Indices N of files named imgN.jpg currently in IMAGE_FOLDER, ascending."""
+    indices = []
+    try:
+        for name in os.listdir(IMAGE_FOLDER):
+            m = re.fullmatch(r"img(\d+)\.jpg", name)
+            if m:
+                indices.append(int(m.group(1)))
+    except FileNotFoundError:
+        pass
+    return sorted(indices)
+
+
+def count_images():
+    return len(list_image_indices())
+
+
+def next_image_index():
+    """Index for the next capture: one past the current highest, or 0 if empty.
+    Captures always append to the end of the list and never overwrite."""
+    indices = list_image_indices()
+    return (indices[-1] + 1) if indices else 0
+
+
+def overlay_pip(base, thumb, label):
+    """Paste the thumbnail into the top-right corner of base, in place.
+    Cheap per-frame: one slice copy plus a border/label -- no full-frame work,
+    so the live feed keeps running underneath it."""
+    bh, bw = base.shape[:2]
+    th, tw = thumb.shape[:2]
+    x2 = bw - PIP_MARGIN
+    x1 = x2 - tw
+    y1 = PIP_MARGIN
+    y2 = y1 + th
+    if x1 < 0 or y2 > bh:
+        return base
+    base[y1:y2, x1:x2] = thumb
+    cv2.rectangle(base, (x1 - 2, y1 - 2), (x2 + 1, y2 + 1), (0, 255, 0), 2)
+    cv2.putText(base, label, (x1, y2 + 24), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    return base
 
 
 def connect_controller(controller):
@@ -401,7 +449,11 @@ if __name__ == "__main__":
     controller = None
     picture_was_pressed = True
     generate_was_pressed = True
-    num_pictures = 0
+    delete_was_pressed = True
+
+    preview_thumb = None
+    preview_label = ""
+    preview_until = 0.0
 
     try:
         for i, url in enumerate(CAMERA_URLS):
@@ -430,15 +482,21 @@ if __name__ == "__main__":
             print("[System] No controller connected. Plug in a controller to use photogrammetry.")
 
         while not interrupt_event.is_set():
+            now = time.time()
             imgs = [ai_view] + local_views[1:4]
 
             if len(imgs) == 4:
                 combined = combine(imgs)
 
                 if ENABLE_LOGGING:
-                    now = time.time()
                     lat0 = now - sync_dict.get("lat_0", now)
                     cv2.putText(combined, f"Latency: {lat0:.3f}s", (7, 130), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+                if preview_thumb is not None:
+                    if now < preview_until:
+                        overlay_pip(combined, preview_thumb, preview_label)
+                    else:
+                        preview_thumb = None
 
                 cv2.imshow("Slugbotics Topside", combined)
 
@@ -449,19 +507,49 @@ if __name__ == "__main__":
             pygame.event.pump()
             controller = connect_controller(controller)
             if controller is not None:
-                picture = bool(controller.get_button(0))
-                generate = bool(controller.get_button(1))
+                picture = bool(controller.get_button(0))   # A button
+                generate = bool(controller.get_button(1))   # B button
+                delete = bool(controller.get_button(2))     # X button
 
                 if picture and not picture_was_pressed:
-                    filename = os.path.join(IMAGE_FOLDER, f"img{num_pictures}.jpg")
-                    print(f"[System] Image saved in images/img{num_pictures}.jpg")
-
-                    success = cv2.imwrite(filename, local_views[0], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                    snapshot = local_views[0].copy()
+                    idx = next_image_index()
+                    filename = os.path.join(IMAGE_FOLDER, f"img{idx}.jpg")
+                    success = cv2.imwrite(filename, snapshot, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
                     if success:
-                        print(f"[System] Image successfully saved: {filename}")
+                        total = count_images()
+                        print(f"[System] Image saved: images/img{idx}.jpg  ({total} image(s) in folder)")
+                        preview_thumb = cv2.resize(snapshot, (PIP_W, PIP_H))
+                        preview_label = f"img{idx}.jpg  [{total}]"
+                        preview_until = time.time() + PREVIEW_DURATION
                     else:
                         print(f"[ERROR] Failed to save image to: {filename}. Check folder permissions.")
-                    num_pictures += 1
+
+                if delete and not delete_was_pressed:
+                    indices = list_image_indices()
+                    if not indices:
+                        print("[System] No images to delete.")
+                    else:
+                        idx = indices[-1]
+                        target = os.path.join(IMAGE_FOLDER, f"img{idx}.jpg")
+                        try:
+                            os.remove(target)
+                        except OSError as e:
+                            print(f"[ERROR] Could not delete img{idx}.jpg: {e}")
+                        else:
+                            remaining = list_image_indices()
+                            print(f"[System] Deleted img{idx}.jpg  --  {len(remaining)} image(s) remaining in images/")
+                            if remaining:
+                                nidx = remaining[-1]
+                                shown = cv2.imread(os.path.join(IMAGE_FOLDER, f"img{nidx}.jpg"))
+                                if shown is not None:
+                                    preview_thumb = cv2.resize(shown, (PIP_W, PIP_H))
+                                    preview_label = f"deleted img{idx} | newest img{nidx} [{len(remaining)}]"
+                                    preview_until = time.time() + PREVIEW_DURATION
+                                else:
+                                    preview_thumb = None
+                            else:
+                                preview_thumb = None 
 
                 if generate and not generate_was_pressed:
                     if status_dict["generating"]:
@@ -475,6 +563,7 @@ if __name__ == "__main__":
 
                 picture_was_pressed = picture
                 generate_was_pressed = generate
+                delete_was_pressed = delete
     except pygame.error:
         print("[System] Mid-frame communication dropped. Forcing disconnect state...")
         controller = None

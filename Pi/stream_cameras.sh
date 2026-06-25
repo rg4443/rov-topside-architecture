@@ -137,7 +137,7 @@ stream_camera() {
         echo "Starting stream for $node -> $output_url:$port  $CONFIG_DESC"
 
         : > "$prog"
-        ffmpeg -progress "$prog" -stats_period 1 $IN_ARGS -i "$node" $OUT_ARGS "$output_url:$port" &
+        ffmpeg -progress "$prog" $IN_ARGS -i "$node" $OUT_ARGS "$output_url:$port" &
         fpid=$!
 
         last=0; stalls=0

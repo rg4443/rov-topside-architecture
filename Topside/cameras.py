@@ -119,6 +119,10 @@ def inference_worker(raw_shm_name, out_shm_name, sync_dict, interrupt_event):
 
     try:
         while not interrupt_event.is_set():
+            if not sync_dict.get("inference_enabled", True):
+                time.sleep(0.05)
+                continue
+
             current_tick = sync_dict.get("frame_tick_0", 0)
 
             if current_tick != last_tick:
@@ -423,6 +427,7 @@ if __name__ == "__main__":
         sync_dict[f"lat_{i}"] = time.time()
         sync_dict[f"frame_tick_{i}"] = 0
     sync_dict["inference_time"] = 0.0
+    sync_dict["inference_enabled"] = False
 
     shm_buffers = []
     cam_shm_names = []
@@ -449,6 +454,9 @@ if __name__ == "__main__":
     generate_was_pressed = True
     delete_was_pressed = True
 
+    ai_proc = None
+    inference_on = False
+
     preview_thumb = None
     preview_label = ""
     preview_until = 0.0
@@ -459,11 +467,6 @@ if __name__ == "__main__":
             p.daemon = True
             processes.append(p)
             p.start()
-
-        ai_proc = mp.Process(target=inference_worker, args=(cam_shm_names[0], ai_out_shm.name, sync_dict, interrupt_event))
-        ai_proc.daemon = True
-        processes.append(ai_proc)
-        ai_proc.start()
 
         if ENABLE_LOGGING:
             log_proc = mp.Process(target=telemetry_logger, args=(sync_dict, interrupt_event))
@@ -481,10 +484,19 @@ if __name__ == "__main__":
 
         while not interrupt_event.is_set():
             now = time.time()
-            imgs = [ai_view, local_views[1], local_views[2]]
+            ai_ready = sync_dict.get("inference_time", 0.0) > 0
+            main_view = ai_view if (inference_on and ai_ready) else local_views[0]
+            imgs = [main_view, local_views[1], local_views[2]]
 
             if len(imgs) == 3:
                 combined = combine(imgs)
+
+                if not inference_on:
+                    cv2.putText(combined, "AI: OFF (press 'i')", (20, 44),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.1, (180, 180, 180), 2)
+                elif not ai_ready:
+                    cv2.putText(combined, "AI: LOADING...", (20, 44),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 200, 255), 2)
 
                 if ENABLE_LOGGING:
                     lat0 = now - sync_dict.get("lat_0", now)
@@ -501,6 +513,27 @@ if __name__ == "__main__":
             key = cv2.waitKey(16) & 0xFF
             if key in (ord("q"), ord("Q")):
                 interrupt_event.set()
+
+            elif key in (ord("i"), ord("I")):
+                inference_on = not inference_on
+                sync_dict["inference_enabled"] = inference_on
+                if inference_on:
+                    if ai_proc is None or not ai_proc.is_alive():
+                        print("[System] Starting AI inference process (loading YOLO)...")
+                        ai_proc = mp.Process(target=inference_worker,
+                                             args=(cam_shm_names[0], ai_out_shm.name, sync_dict, interrupt_event))
+                        ai_proc.daemon = True
+                        ai_proc.start()
+                        processes.append(ai_proc)
+                else:
+                    if ai_proc is not None and ai_proc.is_alive():
+                        ai_proc.terminate()
+                        ai_proc.join(timeout=2.0)
+                    if ai_proc in processes:
+                        processes.remove(ai_proc)
+                    ai_proc = None
+                    sync_dict["inference_time"] = 0.0
+                print(f"[System] AI inference {'ON' if inference_on else 'OFF'}.")
 
             pygame.event.pump()
             controller = connect_controller(controller)

@@ -26,7 +26,7 @@ MATE ROV missions score on a robot's ability to complete tasks underwater and re
 │   /dev/v4l cameras    │   MJPG/H264/    |    memory (zero-copy numpy views)  │
 │ - format/resolution   │   YUYV, per-cam │                                    |
 │   negotiation         │                 │ inference_worker (isolated proc)   │
-│ - stall watchdog +    │                 │  - YOLOv11 (best.pt) on cam 0       │
+│ - stall watchdog +    │                 │  - YOLOv11 (best.pt) on cam 0      │
 │   auto-restart per cam│                 │  - live bounding boxes + crab      │
 └───────────────────────┘                 │    count overlay                   │
                                           │                                    │
@@ -64,8 +64,8 @@ MATE ROV missions score on a robot's ability to complete tasks underwater and re
 | `Pi/stream_cameras.sh`                   | Onboard (ROV): discovers `/dev/v4l` cameras, negotiates pixel format/resolution, streams each feed to topside over UDP via `ffmpeg`, with a per-camera stall watchdog and auto-restart                                  |
 | `Topside/cameras.py`                     | Surface: receives the UDP streams, runs multi-process shared-memory capture, real-time YOLOv11 inference on the main feed, pilot controller input (capture/delete/trigger-photogrammetry), and renders the combined HUD |
 | `Topside/test_cameras.py`                | Local dev/test variant of `cameras.py`, reads from local webcams instead of UDP streams, no pygame/controller dependency                                                                                                |
-| `Topside/best.pt`                        | YOLOv11 weights, trained for green-crab detection/counting                                                                                                                                                              |
-| `Topside/dockerfile`                     | Build for the photogrammetry pipeline image (COLMAP + OpenMVS)                                                                                                                                                          |
+| `Topside/best.pt (git ignored)`          | YOLOv11 weights, trained for green-crab detection/counting                                                                                                                                                              |
+| `Topside/Dockerfile`                     | Build for the photogrammetry pipeline image (COLMAP + OpenMVS)                                                                                                                                                          |
 | `Topside/run_photogrammetry_pipeline.sh` | Launches the photogrammetry Docker container with the correct X11/display flags for the host OS                                                                                                                         |
 | `Topside/requirements.txt`               | Python dependencies for the topside app                                                                                                                                                                                 |
 
